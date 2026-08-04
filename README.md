@@ -1,8 +1,12 @@
-# Proof Sheet
+# pLaTeX
 
-A LaTeX speed-typesetting game, in the spirit of [TeXnique](https://texnique.xyz/)
-but for **full LaTeX** rather than only maths. You get a printed page; reproduce
-it in LaTeX before the clock runs out.
+Play + LaTeX. A speed-typesetting game in the spirit of
+[TeXnique](https://texnique.xyz/) but for **full LaTeX** rather than only maths.
+You get a printed page; reproduce it in LaTeX before the clock runs out.
+
+The wordmark is set with LaTeX's own logo kerning, with gentler pulls than the
+canonical ratios because the interface is monospaced. See `.logotype` in
+`src/styles.css`.
 
 Problems cover maths, text formatting, accents and symbols, lists, tables, boxes
 and spacing, TikZ, and document structure.

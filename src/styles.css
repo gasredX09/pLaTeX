@@ -1,5 +1,5 @@
 /*
- * "Proof sheet" — a typesetter's proofing station.
+ * pLaTeX, dressed as a typesetter's proofing station.
  *
  * The design has two voices, and the contrast between them is the type system:
  *   Paper   the rendered TeX page, genuine Computer Modern on white. Nothing in
@@ -97,24 +97,77 @@ body {
 }
 
 .wordmark {
-  font-family: var(--machine);
   font-size: clamp(2.5rem, 9vw, 4rem);
-  font-weight: 600;
-  letter-spacing: -0.04em;
   line-height: 1;
   margin: var(--step) 0;
   display: flex;
   align-items: center;
-  gap: 0.5ch;
+  gap: 0.75ch;
   flex-wrap: wrap;
 }
 
-/* Stands in for the em-dash between the two words: a printed rule, not a glyph. */
+/* A printed rule closing the line, in place of a tagline. */
 .wordmark-rule {
   flex: 1;
   min-width: 2rem;
   height: 3px;
   background: var(--ink);
+}
+
+/*
+ * The name is play + LaTeX, so it is set with LaTeX's own logo kerning: the A
+ * raised and reduced, the E dropped, both pulled tight against their neighbours.
+ * The offsets are the ratios the real logo uses. Letters stay in reading order
+ * in the markup, so the accessible name is still "pLaTeX".
+ */
+.logotype {
+  font-family: var(--machine);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+
+.logotype-a,
+.logotype-e {
+  text-transform: uppercase;
+}
+
+/*
+ * The pulls are gentler than the canonical logo's. Those ratios assume a
+ * proportional serif, where L carries its ink at the left of a narrow advance
+ * and the A slots into the gap. Every glyph here occupies a full monospace
+ * advance, so the same negative margins drive L and A into one another.
+ */
+.logotype-a {
+  font-size: 0.72em;
+  vertical-align: 0.3em;
+  margin-left: -0.16em;
+  margin-right: -0.06em;
+}
+
+.logotype-e {
+  vertical-align: -0.2em;
+  margin-left: -0.05em;
+  margin-right: -0.05em;
+}
+
+.logotype-l {
+  margin-right: -0.02em;
+}
+
+/* Sits above the rail rather than inside it, so it never competes with the
+   clock for the eye or for horizontal room. */
+.screen-mark {
+  margin: 0 0 var(--step);
+}
+
+/* A quiet version for the screens where the clock or the score is the hero. */
+.logotype-small {
+  font-family: var(--machine);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 .standfirst {
