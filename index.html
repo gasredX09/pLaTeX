@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Proof Sheet: a full-LaTeX typesetting game</title>
+    <!-- The stylesheet is imported from main.ts so the build hashes and inlines
+         it; a link to /src would not survive `vite build`. -->
+  </head>
+  <body>
+    <!-- ------------------------------------------------------------ intro -->
+    <section class="screen" id="intro">
+      <header class="masthead">
+        <p class="eyebrow">A typesetting game</p>
+        <h1 class="wordmark">Proof<span class="wordmark-rule"></span>Sheet</h1>
+        <p class="standfirst">
+          You get a printed page. Reproduce it in LaTeX before the clock runs out.
+        </p>
+      </header>
+
+      <div class="brief">
+        <dl>
+          <dt>What counts</dt>
+          <dd>
+            Your source is compiled by a real TeX engine and compared to the target
+            pixel for pixel. Anything that typesets identically is accepted, so
+            <code>\textbf{x}</code> and <code>{\bfseries x}</code> are equally right.
+          </dd>
+
+          <dt>What you write</dt>
+          <dd>
+            The document body only. The class and preamble are already set, with
+            <code>amsmath</code>, <code>tikz</code>, <code>xcolor</code> and friends
+            loaded.
+          </dd>
+
+          <dt>Scoring</dt>
+          <dd>
+            One point per ten characters of the target's source. Three minutes on
+            the clock. Skipping costs nothing but time.
+          </dd>
+        </dl>
+      </div>
+
+      <div class="launch">
+        <button class="button button-primary" id="start" disabled>
+          Warming the type
+        </button>
+        <p class="engine-status" id="engine-status">
+          Loading a TeX Live distribution into your browser. This happens once.
+        </p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------- play -->
+    <section class="screen" id="play" hidden>
+      <div class="rail">
+        <div class="rail-clock">
+          <span class="clock" id="clock">3:00</span>
+          <div class="clock-track"><div class="clock-fill" id="clock-fill"></div></div>
+        </div>
+        <div class="rail-score">
+          <span class="score-value" id="score">0</span>
+          <span class="label">points</span>
+        </div>
+      </div>
+
+      <header class="problem">
+        <p class="problem-meta">
+          <span class="problem-number" id="problem-number">Problem 1</span>
+          <span class="problem-points" id="problem-points">(4 points)</span>
+        </p>
+        <h2 class="problem-title" id="problem-title">—</h2>
+        <p class="problem-description" id="problem-description"></p>
+      </header>
+
+      <div class="proof" id="proof">
+        <figure class="plate">
+          <figcaption class="label">Target</figcaption>
+          <div class="paper"><canvas id="target-canvas"></canvas></div>
+        </figure>
+
+        <!-- The registration mark: printers align plates by it, and it is exactly
+             what this game measures. Offset while the impressions differ, locked
+             when they match. -->
+        <div class="registration" id="registration" aria-hidden="true">
+          <svg viewBox="0 0 40 40">
+            <circle class="reg-ring" cx="20" cy="20" r="11" />
+            <g class="reg-cross-a">
+              <line x1="20" y1="2" x2="20" y2="14" />
+              <line x1="20" y1="26" x2="20" y2="38" />
+            </g>
+            <g class="reg-cross-b">
+              <line x1="2" y1="20" x2="14" y2="20" />
+              <line x1="26" y1="20" x2="38" y2="20" />
+            </g>
+          </svg>
+        </div>
+
+        <figure class="plate">
+          <figcaption class="label">Yours</figcaption>
+          <div class="paper"><canvas id="attempt-canvas"></canvas></div>
+        </figure>
+      </div>
+
+      <div class="console">
+        <textarea
+          id="input"
+          class="editor"
+          spellcheck="false"
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
+          placeholder="Type the body here…"
+          aria-label="LaTeX source"
+        ></textarea>
+        <div class="console-foot">
+          <p class="status" id="status" role="status"><span class="dot"></span><span id="status-text">Ready</span></p>
+          <button class="button" id="skip">Skip</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- -------------------------------------------------------------- end -->
+    <section class="screen" id="end" hidden>
+      <header class="masthead">
+        <p class="eyebrow">Time up</p>
+        <h1 class="final-score"><span id="final-score">0</span> <small>points</small></h1>
+        <p class="standfirst" id="final-summary"></p>
+      </header>
+
+      <div class="ledger">
+        <div class="ledger-column">
+          <h3 class="label">Set</h3>
+          <ul id="solved-list" class="ledger-list"></ul>
+        </div>
+        <div class="ledger-column">
+          <h3 class="label">Passed over</h3>
+          <ul id="skipped-list" class="ledger-list"></ul>
+        </div>
+      </div>
+
+      <div class="launch">
+        <button class="button button-primary" id="again">Run it again</button>
+      </div>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

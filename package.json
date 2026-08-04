@@ -1,0 +1,31 @@
+{
+  "name": "latex-game",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "setup": "bash scripts/fetch-tex-assets.sh",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "tsx scripts/smoke.ts",
+    "verify:problems": "tsx scripts/verify-problems.ts",
+    "verify": "npm run test && npm run smoke && npm run verify:problems && npm run build && npm run verify:build",
+    "shots": "tsx scripts/shots.ts",
+    "verify:build": "tsx scripts/verify-build.ts"
+  },
+  "dependencies": {
+    "@siglum/engine": "^0.1.4",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "playwright": "^1.62.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11",
+    "vitest": "^3.0.5"
+  }
+}

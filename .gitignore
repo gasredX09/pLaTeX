@@ -1,0 +1,5 @@
+node_modules/
+dist/
+
+# TeX engine + package bundles (~220MB). Run `npm run setup` to fetch.
+public/tex/
