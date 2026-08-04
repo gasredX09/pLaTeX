@@ -100,6 +100,27 @@ try {
   // The insertion is undone; what remains must still be the earlier typing.
   check('undo removes only the pair', afterUndo, 'abc');
 
+  console.log('\n-- a failed compile explains itself');
+  // The mistake that prompted this: a maths command in a sentence. "Does not
+  // compile" alone left a player with nowhere to go.
+  await typeInto(ed, 'The ratio is \\frac{3}{4}.');
+  await page.waitForFunction(
+    () => document.getElementById('tutorial-status')?.className.includes('invalid') ?? false,
+    null,
+    { timeout: 60_000 },
+  );
+  const shown = (await page.textContent('#tutorial-status-text'))?.trim() ?? '';
+  check(
+    'the status names the cause',
+    shown,
+    'Does not compile: Maths outside maths mode. Wrap it in $…$ or \\[…\\].',
+  );
+  check(
+    "TeX's own wording is kept on hover",
+    await page.getAttribute('#tutorial-status-text', 'title'),
+    'Missing $ inserted.',
+  );
+
   console.log('\n-- the render still recompiles');
   await typeInto(ed, '\\textbf{Hello, TeX!');
   // Typed without the final brace: auto-close supplies it, so this should match.

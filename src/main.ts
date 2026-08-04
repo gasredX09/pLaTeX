@@ -22,7 +22,8 @@ import { formatPoints } from './scoring.js';
 import { TexEngine } from './tex/engine.js';
 import { PRELOAD_BUNDLES } from './tex/document.js';
 import { FIRST_VISIT_MB } from './tex/warmProgress.js';
-import { AttemptChecker, type CheckStatus } from './tex/compileQueue.js';
+import { AttemptChecker, type CheckStatus, type CheckOutcome } from './tex/compileQueue.js';
+import type { TexError } from './tex/explainError.js';
 import { planKey, planIndent } from './editor/autoPairs.js';
 import { applyEdit } from './editor/textareaEdit.js';
 import { paint } from './render/rasterize.js';
@@ -532,27 +533,33 @@ const STATUS_TEXT: Record<CheckStatus, string> = {
   timeout: 'That took too long to typeset. Engine restarted.',
 };
 
-function setStatus(status: CheckStatus, override?: string): void {
-  ui.statusText.textContent = override ?? STATUS_TEXT[status];
+/**
+ * "Does not compile" on its own leaves a player with nowhere to go, which is the
+ * whole reason the TeX log is captured. When the failure is understood, say what
+ * to change; keep TeX's own wording in the tooltip for anyone who wants it.
+ */
+function describeStatus(status: CheckStatus, error?: TexError | null): string {
+  if (status !== 'invalid' || !error) return STATUS_TEXT[status];
+  return `Does not compile: ${error.message}`;
+}
+
+function setStatus(status: CheckStatus, override?: string, error?: TexError | null): void {
+  ui.statusText.textContent = override ?? describeStatus(status, error);
+  ui.statusText.title = error?.raw ?? '';
   ui.status.className = `status is-${status}`;
   ui.registration.className = `registration is-${status}`;
 }
 
-function setTutorialStatus(status: CheckStatus, override?: string): void {
-  ui.tutorialStatusText.textContent = override ?? STATUS_TEXT[status];
+function setTutorialStatus(status: CheckStatus, override?: string, error?: TexError | null): void {
+  ui.tutorialStatusText.textContent = override ?? describeStatus(status, error);
+  ui.tutorialStatusText.title = error?.raw ?? '';
   ui.tutorialStatus.className = `status is-${status}`;
   ui.tutorialRegistration.className = `registration is-${status}`;
 }
 
-function onTutorialOutcome({
-  status,
-  image,
-}: {
-  status: CheckStatus;
-  image?: ImageData;
-}): void {
+function onTutorialOutcome({ status, image, error }: CheckOutcome): void {
   if (ui.tutorial.hidden) return;
-  setTutorialStatus(status);
+  setTutorialStatus(status, undefined, error);
   if (image) paint(ui.tutorialAttemptCanvas, image);
   else if (status === 'idle' || status === 'invalid') clearCanvas(ui.tutorialAttemptCanvas);
 
@@ -568,10 +575,10 @@ function onTutorialOutcome({
   }
 }
 
-function onCheckOutcome({ status, image }: { status: CheckStatus; image?: ImageData }): void {
+function onCheckOutcome({ status, image, error }: CheckOutcome): void {
   if (!activeProblem() || awaitingAdvance) return;
 
-  setStatus(status);
+  setStatus(status, undefined, error);
   if (image) paint(ui.attemptCanvas, image);
   else if (status === 'idle' || status === 'invalid') clearCanvas(ui.attemptCanvas);
 

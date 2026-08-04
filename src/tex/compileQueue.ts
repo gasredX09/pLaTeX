@@ -9,6 +9,7 @@ import { normalize } from '../normalize.js';
 import { compareBitmaps } from '../render/compare.js';
 import { rasterizeFirstPage } from '../render/rasterize.js';
 import type { TexEngine } from './engine.js';
+import type { TexError } from './explainError.js';
 
 /**
  * Quiet period before compiling. Long enough that mid-word keystrokes do not
@@ -31,6 +32,8 @@ export interface CheckOutcome {
   status: CheckStatus;
   /** The attempt's render, for live preview. Absent when it did not compile. */
   image?: ImageData;
+  /** Why it did not compile, restated for a player. Only set for 'invalid'. */
+  error?: TexError | null;
 }
 
 export class AttemptChecker {
@@ -94,7 +97,7 @@ export class AttemptChecker {
       return;
     }
     if (outcome.status === 'error') {
-      this.onOutcome({ status: 'invalid' });
+      this.onOutcome({ status: 'invalid', error: outcome.error });
       return;
     }
 

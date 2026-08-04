@@ -68,6 +68,27 @@ Two consequences worth stating, because they are the whole risk of the feature:
 
 `Tab` inserts two spaces. Modifier chords and IME composition are left alone.
 
+## When it does not compile
+
+The status line under the editor says what to change, not just that something is
+wrong. `The ratio is \frac{3}{4}.` reports:
+
+> Does not compile: Maths outside maths mode. Wrap it in $…$ or \[…\].
+
+TeX's own wording (`Missing $ inserted.`) is kept in the tooltip. Around twenty
+common errors are restated this way in `src/tex/explainError.ts` — unknown
+commands, brace and environment mismatches, stray `&`, stacked scripts, lists
+with no `\item`. Anything unrecognised falls through to TeX's wording rather
+than a vague placeholder.
+
+Getting this required running the engine with `verbose: true`. With it off, the
+real error never reaches the page at all: the log contains only a generic
+Emscripten exit line, which is why the status could previously say no more than
+"Does not compile". The engine's docs warn that verbose is expensive, but that
+warning is about writing every line into the DOM. Measured either way, the median
+compile is 77ms; `captureDiagnostic` keeps only the `!` line, the `l.NNN` marker
+and a little context, and discards the other ~3,000 lines as they arrive.
+
 ## Setup
 
 ```bash
@@ -89,10 +110,10 @@ npm run verify           # everything below, in order
 | Command | What it covers |
 | --- | --- |
 | `npm test` | Pure logic: both session types, catalog separation, practice progress, scoring, normalization, pixel comparison, and hash shim |
-| `npm run smoke` | Engine init, cross-origin isolation, render determinism, equivalent-markup matching, near-miss rejection, recovery from a runaway macro |
+| `npm run smoke` | Engine init, cross-origin isolation, render determinism, equivalent-markup matching, near-miss rejection, that a failed compile is explained, recovery from a runaway macro |
 | `npm run verify:problems` | Every problem compiles, renders non-blank, fits one page, stays inside the margins, and loads only bundled packages |
 | `npm run verify:best` | The personal best across several runs: first record, missed record, beaten record, and survival of a reload |
-| `npm run verify:editor` | Auto-closing delimiters driven by real keystrokes, that undo survives, and that a problem typed key by key still solves |
+| `npm run verify:editor` | Auto-closing delimiters driven by real keystrokes, that undo survives, that a compile error names its cause, and that a problem typed key by key still solves |
 | `npm run verify:build` | Both modes actually play through the production bundle, including persisted practice progress |
 | `npm run shots` | Screenshots of every screen and state, for design review |
 
@@ -235,6 +256,7 @@ src/
     warmProgress.ts    coarse cold-start milestones                    [tested]
     compileQueue.ts    debounce, drop stale results, compare
     blake3-shim.ts     replaces an unbundlable dependency            [tested]
+    explainError.ts    restates a TeX error for a player              [tested]
   render/
     rasterize.ts       PDF bytes to pixels via pdf.js
     compare.ts         strict pixel equality                         [tested]

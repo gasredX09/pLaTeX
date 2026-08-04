@@ -8,6 +8,7 @@
 import { SiglumCompiler } from '@siglum/engine';
 import { buildDocument } from './document.js';
 import { warmMilestone } from './warmProgress.js';
+import { explainTexError, type TexError } from './explainError.js';
 
 /**
  * Where the engine's ~50MB of wasm and packages live.
@@ -45,8 +46,11 @@ export const COMPILE_TIMEOUT_MS = 5_000;
 
 export type CompileOutcome =
   | { status: 'ok'; pdf: Uint8Array }
-  | { status: 'error'; log: string }
+  | { status: 'error'; log: string; error: TexError | null }
   | { status: 'timeout' };
+
+/** Cap on retained diagnostic lines; a TeX error is described in a handful. */
+const MAX_DIAGNOSTIC_LINES = 24;
 
 export type EngineStage = 'idle' | 'loading' | 'ready' | 'restarting' | 'failed';
 
@@ -63,6 +67,13 @@ export class TexEngine {
   private warmPercent = 0;
   /** Serializes compiles: the engine holds a single pending-compile slot. */
   private queue: Promise<unknown> = Promise.resolve();
+  /**
+   * Diagnostic lines from the compile in flight. Safe as one buffer because
+   * compiles are serialized, and reset at the start of each.
+   */
+  private diagnostics: string[] = [];
+  /** How many more lines to keep after an error line, for context. */
+  private diagnosticTail = 0;
 
   stage: EngineStage = 'idle';
   onStageChange: (stage: EngineStage, detail?: string, percent?: number) => void = () => {};
@@ -76,11 +87,34 @@ export class TexEngine {
 
   private trackLog(message: string): void {
     this.options.onLog?.(message);
+    this.captureDiagnostic(message);
     if (this.stage !== 'loading') return;
     const milestone = warmMilestone(message);
     if (!milestone || milestone.percent <= this.warmPercent) return;
     this.warmPercent = milestone.percent;
     this.setStage('loading', milestone.detail, milestone.percent);
+  }
+
+  /**
+   * Keeps the few log lines that describe an error, discarding the rest.
+   *
+   * TeX emits roughly 3,000 lines per compile and this runs on every keystroke,
+   * so nothing is retained that cannot explain a failure: the `!` line, the
+   * `l.NNN` source marker, and a little of what follows them.
+   */
+  private captureDiagnostic(message: string): void {
+    if (this.diagnostics.length >= MAX_DIAGNOSTIC_LINES) return;
+    const line = message.replace(/^\[TeX(?:\s+ERR)?\]\s*/, '');
+    if (line.startsWith('!') || /^l\.\d+/.test(line)) {
+      this.diagnostics.push(message);
+      this.diagnosticTail = 3;
+      return;
+    }
+    // A couple of lines after an error often carry the offending token.
+    if (this.diagnosticTail > 0) {
+      this.diagnosticTail--;
+      this.diagnostics.push(message);
+    }
   }
 
   private create(): SiglumCompiler {
@@ -93,7 +127,12 @@ export class TexEngine {
       enableDocCache: true,
       // With no CTAN and a fixed preamble there is nothing worth retrying much.
       maxRetries: 3,
-      verbose: this.options.verbose ?? false,
+      // On, so a failed compile can be explained to the player. TeX's actual
+      // error never reaches us otherwise; the log holds only a generic exit
+      // line. Measured cost: none, median compile 77ms either way. The engine's
+      // warning about verbose concerns writing every line into the DOM, which
+      // captureDiagnostic deliberately does not do.
+      verbose: true,
       onLog: (message) => this.trackLog(message),
       onProgress: (stageName, detail) => {
         if (this.stage === 'loading') {
@@ -165,9 +204,12 @@ export class TexEngine {
   private async compileNow(body: string, extraPreamble?: string): Promise<CompileOutcome> {
     await this.warm();
     const compiler = this.compiler;
-    if (!compiler) return { status: 'error', log: 'engine unavailable' };
+    if (!compiler) return { status: 'error', log: 'engine unavailable', error: null };
 
     const source = buildDocument(body, extraPreamble);
+    // Only this compile's diagnostics should describe this compile.
+    this.diagnostics = [];
+    this.diagnosticTail = 0;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<'timeout'>((resolve) => {
@@ -186,13 +228,23 @@ export class TexEngine {
       }
       if (!result.success || !result.pdf) {
         const detail = [result.error, result.log].filter(Boolean).join('\n');
-        return { status: 'error', log: detail || 'compilation failed (no log returned)' };
+        // The captured lines describe the failure; result.log usually does not.
+        const explained = explainTexError(this.diagnostics) ?? explainTexError(detail.split('\n'));
+        return {
+          status: 'error',
+          log: detail || this.diagnostics.join('\n') || 'compilation failed (no log returned)',
+          error: explained,
+        };
       }
       // The engine may hand back a view onto a SharedArrayBuffer it reuses for
       // the next compile. Copy before the bytes are overwritten underneath us.
       return { status: 'ok', pdf: new Uint8Array(result.pdf) };
     } catch (err) {
-      return { status: 'error', log: err instanceof Error ? err.message : String(err) };
+      return {
+        status: 'error',
+        log: err instanceof Error ? err.message : String(err),
+        error: null,
+      };
     } finally {
       clearTimeout(timer);
     }

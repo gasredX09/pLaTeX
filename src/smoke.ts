@@ -118,6 +118,17 @@ async function main(): Promise<void> {
   const broken = await engine.compile(String.raw`\frac{1`);
   check('unbalanced brace reports an error', broken.status === 'error', broken.status);
 
+  // 6a. And it must say *why*, or the player has nowhere to go. TeX's real error
+  // only reaches us because the engine runs verbose; without that the log holds
+  // nothing but a generic exit line.
+  const mathsOutside = await engine.compile(String.raw`The ratio is \frac{3}{4}.`);
+  check(
+    'a failed compile is explained',
+    mathsOutside.status === 'error' &&
+      (mathsOutside.error?.message.includes('Maths outside maths mode') ?? false),
+    mathsOutside.status === 'error' ? (mathsOutside.error?.message ?? 'no explanation') : mathsOutside.status,
+  );
+
   // 7. Runaway expansion must not wedge the engine.
   const t2 = performance.now();
   const runaway = await engine.compile(String.raw`\def\x{\x}\x`);
