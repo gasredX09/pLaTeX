@@ -64,24 +64,51 @@ is needed.
 
 ## Hosting
 
-Two requirements, both easy to miss, and both fatal to the engine if unmet.
+### The one hard requirement
 
-**1. Cross-origin isolation.** The engine talks to its worker through a
-`SharedArrayBuffer`, which browsers expose only to isolated pages:
+**Serve `tex/bundles/*.data.gz` as opaque bytes.** Static hosts see the `.gz`
+extension and add `Content-Encoding: gzip`, so the browser silently decompresses
+them. The engine checks for `br` and otherwise assumes the body is still
+compressed, running it through `DecompressionStream('gzip')` itself. Given
+already-expanded bytes it throws, and every package fails to load. Serve these
+with `Content-Type: application/octet-stream` and **no** `Content-Encoding`.
+
+A host that cannot be told this cannot serve the bundles. `vite.config.ts`
+handles it for `dev` and `preview`.
+
+### Cross-origin isolation is optional
+
+The engine prefers a `SharedArrayBuffer`, which browsers expose only to
+cross-origin-isolated pages:
 
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-**2. Serve `tex/bundles/*.data.gz` as opaque bytes.** Static hosts see the `.gz`
-extension and add `Content-Encoding: gzip`, so the browser silently decompresses
-them. The engine checks for `br` and otherwise decompresses the body itself, so
-it receives already-expanded bytes and every package fails to load. Serve these
-with `Content-Type: application/octet-stream` and **no** `Content-Encoding`.
+Its own documentation lists this as a requirement, but it is not one: the code
+falls back to a plain `ArrayBuffer`. Measured without the headers, all 45
+problems still compile and the median compile goes from 101ms to 115ms. Set them
+if you can, but their absence is a performance note, not a blocker.
 
-`vite.config.ts` handles both for `dev` and `preview`; a production host needs
-the same treatment.
+### Size
+
+| | |
+| --- | --- |
+| Deployed assets | ~94MB (29MB wasm, 63MB bundles, 1.6MB manifests) |
+| Transferred on a first visit | ~96MB across 29 requests, ~77MB if the host brotlis the wasm |
+| Transferred on later visits | nothing; the engine caches to browser storage |
+
+Only 17 of the 61 bundles are ever fetched, so the other ~130MB need not be
+deployed. Of what is fetched, `pgf-tikz` (30.6MB) and `tables` (15.8MB) are
+nearly half, and both are pulled in by the shared preamble in
+`src/tex/document.ts` on *every* visit, including for a plain-text problem.
+Moving those `\usepackage` lines onto the handful of problems that need them
+would cut the common first visit by roughly 60%.
+
+At ~77MB per new player, a host with a 100GB monthly cap supports on the order of
+1,300 new players a month. Object storage with no egress charge is the way to
+avoid that ceiling.
 
 ## Adding problems
 
