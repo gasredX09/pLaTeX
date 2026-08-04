@@ -224,7 +224,8 @@ code {
 
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Flows three-up, then two, then one, so a third mode needed no breakpoint. */
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   gap: calc(var(--step) * 2);
   margin-bottom: calc(var(--step) * 3);
 }
@@ -247,6 +248,13 @@ code {
 .mode-card-blaze {
   background: var(--ink);
   color: var(--paper);
+}
+
+/* Marked in the proofreader's red the rest of the interface uses for faults,
+   because that is what this mode is about. */
+.mode-card-fixit {
+  border-color: var(--mark);
+  box-shadow: inset 3px 0 0 var(--mark);
 }
 
 .mode-card:hover:not(:disabled) {

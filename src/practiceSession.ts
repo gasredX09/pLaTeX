@@ -3,20 +3,25 @@ import type { PracticeProblem } from './practiceProblems.js';
 export type PracticeStatus = 'idle' | 'running' | 'complete';
 
 /**
- * A finite, untimed pass through a topic. Items skipped on the first pass are
- * offered once more at the end, then left for the next visit if skipped again.
+ * A finite, untimed pass through a set of items. Items skipped on the first pass
+ * are offered once more at the end, then left for the next visit if skipped
+ * again.
+ *
+ * Generic over the item because Fix-it Mode wants exactly this queue over broken
+ * problems rather than practice exercises. Nothing here reads a field of the
+ * item, so the only thing that had to change was the type.
  */
-export class PracticeSession {
+export class PracticeSession<T = PracticeProblem> {
   status: PracticeStatus = 'idle';
-  readonly completed: PracticeProblem[] = [];
-  readonly leftForLater: PracticeProblem[] = [];
+  readonly completed: T[] = [];
+  readonly leftForLater: T[] = [];
 
-  private queue: PracticeProblem[] = [];
-  private deferred: PracticeProblem[] = [];
+  private queue: T[] = [];
+  private deferred: T[] = [];
   private position = 0;
   private reviewing = false;
 
-  constructor(private readonly problems: readonly PracticeProblem[]) {}
+  constructor(private readonly problems: readonly T[]) {}
 
   start(): void {
     this.completed.length = 0;
@@ -28,9 +33,9 @@ export class PracticeSession {
     this.status = this.queue.length > 0 ? 'running' : 'complete';
   }
 
-  get current(): PracticeProblem {
+  get current(): T {
     const problem = this.queue[this.position];
-    if (!problem) throw new Error('no practice problem loaded');
+    if (!problem) throw new Error('no problem loaded');
     return problem;
   }
 

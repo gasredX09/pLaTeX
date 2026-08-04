@@ -1,9 +1,9 @@
 # pLaTeX
 
-A full-LaTeX typesetting game with two separate experiences. Practice Mode is
-an untimed, topic-by-topic curriculum. Blaze Mode is a three-minute challenge in
-the spirit of [TeXnique](https://texnique.xyz/). In both modes, you get a printed
-page and reproduce it in LaTeX.
+A full-LaTeX typesetting game with three modes. Practice Mode is an untimed,
+topic-by-topic curriculum. Blaze Mode is a three-minute challenge in the spirit
+of [TeXnique](https://texnique.xyz/). Fix-it Mode hands you source that is
+already wrong and asks you to repair it.
 
 The wordmark is set with LaTeX's own logo kerning, with gentler pulls than the
 canonical ratios because the interface is monospaced. See `.logotype` in
@@ -40,6 +40,38 @@ browser so returning players go straight to their selected mode.
 Your Blaze best and Practice completion are kept separately in the browser's
 local storage. There is no server, so both are per browser and per device. A
 scoreless Blaze run is never recorded, and a tie does not count as beating it.
+
+## Fix-it Mode
+
+You are given a source with exactly one fault and the render it should produce.
+Repair it until the two register.
+
+The faults are **generated, not authored**. Every problem already carries a
+correct source, and each mutator in `src/fixit.ts` is a mistake people actually
+make, so the whole catalog became Fix-it content at once: stripped `$` or `\[ \]`
+delimiters, a dropped brace, a misspelt command, an unescaped `\%`, an
+environment closed with the wrong name, a superscript turned subscript, a lost
+row break or `\item`, a shortened dash, a missing tie or accent, a straightened
+quotation mark.
+
+What makes generating them safe is that the win condition is unchanged: your
+render must match the target pixel for pixel. A mutation only has to be *wrong*,
+not wrong in a way the code understands.
+
+The catch is that whether a mutation is wrong **cannot be decided from the text**.
+Dropping the final `}` of `{\huge huge}` leaves a group that closes at the end of
+the document, and `Figure~1` typesets exactly like `Figure 1` unless the line
+happens to break there. Both compile, and both render the target — a puzzle that
+is already solved. Four of the catalog's problems had that property. So each
+problem offers an ordered list of candidate mutations, and Fix-it compiles them
+against the target until one genuinely differs; `scripts/verify-problems.ts`
+proves every problem has at least one that does, and reports the three that fall
+through to a later candidate.
+
+The hint says what kind of fault to look for, taken from the mutator itself, so
+it never gives away where. Compile errors are explained as everywhere else, which
+is often the whole answer: a misspelt `\hline` reports "Unknown command
+\hlien. Check the spelling."
 
 ## The editor
 
@@ -113,9 +145,10 @@ npm run verify           # everything below, in order
 | --- | --- |
 | `npm test` | Pure logic: both session types, catalog separation, practice progress, scoring, normalization, pixel comparison, and hash shim |
 | `npm run smoke` | Engine init, cross-origin isolation, render determinism, equivalent-markup matching, near-miss rejection, that a failed compile is explained, recovery from a runaway macro |
-| `npm run verify:problems` | Every problem compiles, renders non-blank, fits one page, stays inside the margins, and loads only bundled packages |
+| `npm run verify:problems` | Every problem compiles, renders non-blank, fits one page, stays inside the margins, loads only bundled packages, and has at least one Fix-it mutation that does not reproduce the target |
 | `npm run verify:best` | The personal best across several runs: first record, missed record, beaten record, and survival of a reload |
 | `npm run verify:editor` | Auto-closing delimiters driven by real keystrokes, that undo survives, that a compile error names its cause, and that a problem typed key by key still solves |
+| `npm run verify:fixit` | Fix-it end to end: the editor arrives pre-filled and wrong, the hint describes the fault, repairing counts, and a repair left for later comes back |
 | `npm run verify:build` | Both modes actually play through the production bundle, including persisted practice progress |
 | `npm run shots` | Screenshots of every screen and state, for design review |
 
@@ -262,6 +295,7 @@ src/
   render/
     rasterize.ts       PDF bytes to pixels via pdf.js
     compare.ts         strict pixel equality                         [tested]
+  fixit.ts             mutations that turn a source into a puzzle     [tested]
   editor/
     autoPairs.ts       which delimiter to close, and how              [tested]
     textareaEdit.ts    applies an edit without losing native undo

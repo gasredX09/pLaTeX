@@ -65,6 +65,30 @@ export class AttemptChecker {
     return this.target;
   }
 
+  /**
+   * Chooses which broken source to hand a Fix-it player.
+   *
+   * Whether a mutation is a real puzzle cannot be decided from the text: some
+   * compile and still typeset the target exactly. So each candidate is compiled
+   * against the target already cached by setProblem, and the first that either
+   * fails to compile or renders differently is used. Costs one extra compile in
+   * the ordinary case, which is invisible beside the typing debounce.
+   *
+   * Returns null only if every candidate reproduces the target, which the
+   * problem verifier asserts cannot happen for any problem in the catalog.
+   */
+  async pickBrokenSource<T extends { source: string }>(candidates: readonly T[]): Promise<T | null> {
+    for (const candidate of candidates) {
+      const outcome = await this.engine.compile(normalize(candidate.source), this.extraPreamble);
+      // A mutation that will not compile is a valid puzzle; that is the point.
+      if (outcome.status !== 'ok') return candidate;
+
+      const { image } = await rasterizeFirstPage(outcome.pdf);
+      if (!this.target || !compareBitmaps(this.target, image).match) return candidate;
+    }
+    return null;
+  }
+
   /** Records a keystroke. Compiles once the player pauses. */
   update(input: string): void {
     this.cancel();

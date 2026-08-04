@@ -3,7 +3,7 @@
  * keystroke to verdict.
  */
 import './styles.css';
-import { Game, formatClock } from './game.js';
+import { Game, formatClock, shuffled } from './game.js';
 import { blazeProblems, type Problem } from './problems.js';
 import {
   practiceProblems,
@@ -13,6 +13,12 @@ import {
   type PracticeTopic,
 } from './practiceProblems.js';
 import { PracticeSession } from './practiceSession.js';
+import {
+  buildFixitRound,
+  candidateBreaks,
+  FIXIT_ROUND_SIZE,
+  type BrokenProblem,
+} from './fixit.js';
 import {
   completePracticeProblem,
   progressForTopic,
@@ -67,6 +73,7 @@ const ui = {
 
   practiceMode: need<HTMLButtonElement>('practice-mode'),
   blazeMode: need<HTMLButtonElement>('blaze-mode'),
+  fixitMode: need<HTMLButtonElement>('fixit-mode'),
   engineStatus: need<HTMLParagraphElement>('engine-status'),
   engineNote: need<HTMLParagraphElement>('engine-note'),
   engineProgress: need<HTMLProgressElement>('engine-progress'),
@@ -153,11 +160,18 @@ const game = new Game(blazeProblems);
 let practiceSession: PracticeSession | null = null;
 let selectedTopic: PracticeTopic | null = null;
 
-type ActiveMode = 'blaze' | 'practice';
-type PendingStart = { mode: 'blaze' } | { mode: 'practice'; topic: PracticeTopic };
+type ActiveMode = 'blaze' | 'practice' | 'fixit';
+type PendingStart =
+  | { mode: 'blaze' }
+  | { mode: 'practice'; topic: PracticeTopic }
+  | { mode: 'fixit' };
 
 let activeMode: ActiveMode | null = null;
 let pendingStart: PendingStart | null = null;
+/** Fix-it reuses the untimed queue, over broken problems instead of exercises. */
+let fixitSession: PracticeSession<BrokenProblem> | null = null;
+/** Repairs in the current round, for the progress rail. */
+let fixitRoundTotal = 0;
 
 // A short round is handy when checking the end screen. Dev only, so the shipped
 // game always runs the full three minutes.
@@ -187,6 +201,7 @@ engine.onStageChange = (stage, detail, percent) => {
     clearInterval(warmClock);
     ui.practiceMode.disabled = false;
     ui.blazeMode.disabled = false;
+    ui.fixitMode.disabled = false;
     ui.engineProgress.value = 100;
     const seconds = (performance.now() - warmStartedAt) / 1_000;
     const duration = seconds < 1 ? 'under a second' : `${seconds.toFixed(1)}s`;
@@ -309,6 +324,14 @@ function chooseBlaze(): void {
   else void startTutorial();
 }
 
+function chooseFixit(): void {
+  pendingStart = { mode: 'fixit' };
+  // The round is drawn from the Blaze catalog, which includes TikZ problems.
+  engine.preload(PRELOAD_BUNDLES);
+  if (tutorialComplete) continuePendingStart();
+  else void startTutorial();
+}
+
 function choosePracticeTopic(topic: PracticeTopic): void {
   pendingStart = { mode: 'practice', topic };
   if (topic.id === 'tikz') engine.preload(PRELOAD_BUNDLES);
@@ -330,10 +353,11 @@ async function startTutorial(): Promise<void> {
   ui.tutorialInput.disabled = true;
   ui.tutorialContinue.disabled = true;
   ui.tutorialContinue.textContent = 'Match the target to continue';
-  ui.tutorialNote.textContent =
-    destination.mode === 'practice'
-      ? 'Practice Mode has no timer.'
-      : 'The Blaze Mode clock starts after this warm-up.';
+  ui.tutorialNote.textContent = {
+    practice: 'Practice Mode has no timer.',
+    fixit: 'Fix-it Mode has no timer either.',
+    blaze: 'The Blaze Mode clock starts after this warm-up.',
+  }[destination.mode];
   clearCanvas(ui.tutorialTargetCanvas);
   clearCanvas(ui.tutorialAttemptCanvas);
   setTutorialStatus('compiling', 'Preparing the warm-up target');
@@ -344,9 +368,7 @@ async function startTutorial(): Promise<void> {
     telemetry.report({ event: 'target_compile_failed', problem: 'tutorial' });
     setTutorialStatus('invalid', 'Warm-up unavailable. Continue to your selected mode.');
     ui.tutorialContinue.disabled = false;
-    ui.tutorialContinue.textContent = destination.mode === 'practice'
-      ? 'Begin Practice Mode'
-      : 'Start Blaze Mode';
+    ui.tutorialContinue.textContent = continueLabel(destination.mode);
     return;
   }
 
@@ -372,6 +394,7 @@ function continuePendingStart(): void {
   pendingStart = null;
   if (!destination) returnHome();
   else if (destination.mode === 'blaze') startBlaze();
+  else if (destination.mode === 'fixit') startFixit();
   else startPractice(destination.topic);
 }
 
@@ -413,13 +436,46 @@ function startPractice(topic: PracticeTopic): void {
   void loadCurrentProblem();
 }
 
+function continueLabel(mode: ActiveMode): string {
+  return {
+    practice: 'Begin Practice Mode',
+    fixit: 'Begin Fix-it Mode',
+    blaze: 'Start Blaze Mode',
+  }[mode];
+}
+
+function startFixit(): void {
+  tutorialChecker.cancel();
+  clearInterval(clockTimer);
+  activeMode = 'fixit';
+  selectedTopic = null;
+  practiceSession = null;
+
+  const round = buildFixitRound(shuffled(blazeProblems), FIXIT_ROUND_SIZE);
+  fixitRoundTotal = round.length;
+  fixitSession = new PracticeSession(round);
+  fixitSession.start();
+
+  configurePlayScreen('fixit');
+  show('play');
+  renderFixitRail();
+  void loadCurrentProblem();
+}
+
 function configurePlayScreen(mode: ActiveMode): void {
-  const practice = mode === 'practice';
-  ui.blazeRail.hidden = practice;
-  ui.practiceRail.hidden = !practice;
-  ui.problemPoints.hidden = practice;
-  ui.practiceTools.hidden = !practice;
-  ui.skip.textContent = practice ? 'Later' : 'Skip';
+  const timed = mode === 'blaze';
+  ui.blazeRail.hidden = !timed;
+  // Fix-it borrows the untimed rail, relabelled by renderFixitRail.
+  ui.practiceRail.hidden = timed;
+  ui.problemPoints.hidden = !timed;
+  // Both untimed modes offer the source as a last resort. Only Practice has a
+  // conceptual hint; Blaze problems, which Fix-it draws from, carry none.
+  ui.practiceTools.hidden = timed;
+  // Both untimed modes defer a skipped item to the end of the round.
+  ui.skip.textContent = timed ? 'Skip' : 'Later';
+  // The shared rail's exit leads back to wherever the mode was entered from,
+  // and Fix-it was not entered from the topic list.
+  ui.practiceExit.textContent = mode === 'fixit' ? 'Choose a mode' : 'Choose topic';
 }
 
 function finishBlaze(): void {
@@ -434,6 +490,8 @@ function finishBlaze(): void {
 function finishPractice(): void {
   checker.cancel();
   ui.input.disabled = true;
+  ui.practiceAgain.textContent = 'Practice this topic again';
+  ui.practiceAnother.hidden = false;
   renderPracticeEnd();
   show('practice-end');
   ui.practiceAgain.focus();
@@ -458,10 +516,21 @@ function renderPracticeRail(): void {
   ui.practiceProgressFill.style.width = `${(progress.completed / progress.total) * 100}%`;
 }
 
+function renderFixitRail(): void {
+  const repaired = fixitSession?.completed.length ?? 0;
+  ui.practiceTopicLabel.textContent = 'Fix-it';
+  ui.practiceProgressText.textContent = `${repaired} of ${fixitRoundTotal} repaired`;
+  const fraction = fixitRoundTotal > 0 ? repaired / fixitRoundTotal : 0;
+  ui.practiceProgressFill.style.width = `${fraction * 100}%`;
+}
+
 function activeProblem(): Problem | null {
   if (activeMode === 'blaze' && game.status === 'running') return game.current;
   if (activeMode === 'practice' && practiceSession?.status === 'running') {
     return practiceSession.current;
+  }
+  if (activeMode === 'fixit' && fixitSession?.status === 'running') {
+    return fixitSession.current.problem;
   }
   return null;
 }
@@ -474,6 +543,10 @@ async function loadCurrentProblem(): Promise<void> {
   if (activeMode === 'blaze') {
     ui.problemNumber.textContent = `Problem ${game.problemNumber}`;
     ui.problemPoints.textContent = formatPoints(game.currentPoints);
+  } else if (activeMode === 'fixit') {
+    const repaired = fixitSession?.completed.length ?? 0;
+    ui.problemNumber.textContent = `Repair ${repaired + 1} of ${fixitRoundTotal}`;
+    resetFixitTools(problem);
   } else {
     const practiceProblem = problem as PracticeProblem;
     const topicProblems = problemsForTopic(practiceProblem.topic);
@@ -504,8 +577,51 @@ async function loadCurrentProblem(): Promise<void> {
     return;
   }
   paint(ui.targetCanvas, target);
+
+  if (activeMode === 'fixit') {
+    // The editor starts wrong on purpose. Which mutation to use cannot be
+    // decided from the text alone, since some compile and still typeset the
+    // target exactly, so candidates are compiled against the target just
+    // rendered and the first genuinely wrong one is used.
+    const candidates = candidateBreaks(problem);
+    const chosen = (await checker.pickBrokenSource(candidates)) ?? candidates[0] ?? null;
+    if (activeProblem() !== problem) return;
+
+    if (!chosen) {
+      // The verifier proves every problem has a playable mutation, so this is
+      // unreachable; skipping beats showing an already-correct puzzle.
+      telemetry.report({ event: 'target_compile_failed', problem: problem.id });
+      advanceActive('skip');
+      return;
+    }
+      // Capitalized, since it stands alone as a sentence in the hint slot.
+    const summary = chosen.mutator.summary;
+    ui.practiceHintText.textContent = `${summary[0]!.toUpperCase()}${summary.slice(1)}.`;
+    ui.input.value = chosen.source;
+    ui.input.disabled = false;
+    ui.input.focus();
+    // Render the broken source at once, so the fault is visible beside the
+    // target rather than only after the first keystroke.
+    checker.update(chosen.source);
+    return;
+  }
+
   ui.input.disabled = false;
   ui.input.focus();
+}
+
+/**
+ * Blaze problems carry no authored hint, but the mutator knows exactly what it
+ * broke, so Fix-it can say what kind of fault to look for without giving away
+ * where it is. Set once the mutation has been chosen.
+ */
+function resetFixitTools(problem: Problem): void {
+  ui.practiceHintText.textContent = '';
+  ui.practiceHintText.hidden = true;
+  ui.practiceHint.textContent = 'Show hint';
+  ui.practiceSolutionCode.textContent = problem.latex;
+  ui.practiceSolution.hidden = true;
+  ui.practiceReveal.textContent = 'Reveal source';
 }
 
 function resetPracticeTools(problem: PracticeProblem): void {
@@ -568,9 +684,7 @@ function onTutorialOutcome({ status, image, error }: CheckOutcome): void {
     ui.tutorialInput.disabled = true;
     rememberTutorial();
     ui.tutorialContinue.disabled = false;
-    ui.tutorialContinue.textContent = pendingStart?.mode === 'practice'
-      ? 'Begin Practice Mode'
-      : 'Start Blaze Mode';
+    ui.tutorialContinue.textContent = continueLabel(pendingStart?.mode ?? 'blaze');
     ui.tutorialContinue.focus();
   }
 }
@@ -603,6 +717,12 @@ function advanceActive(outcome: 'solve' | 'skip'): void {
     if (outcome === 'solve') game.solve();
     else game.skip();
     renderBlazeRail();
+  } else if (mode === 'fixit') {
+    const session = fixitSession;
+    if (!session || session.status !== 'running') return;
+    if (outcome === 'solve') session.solve();
+    else session.skip();
+    renderFixitRail();
   } else {
     const session = practiceSession;
     if (!session || session.status !== 'running') return;
@@ -625,6 +745,10 @@ function advanceActive(outcome: 'solve' | 'skip'): void {
     if (mode === 'blaze' && game.status !== 'running') return;
     if (mode === 'practice' && practiceSession?.status === 'complete') {
       finishPractice();
+      return;
+    }
+    if (mode === 'fixit' && fixitSession?.status === 'complete') {
+      finishFixit();
       return;
     }
     void loadCurrentProblem();
@@ -664,6 +788,42 @@ function renderBlazeEnd(): void {
 
   fill(ui.solvedList, game.solved.map((s) => [s.problem.title, `+${s.points}`]), 'Nothing yet');
   fill(ui.skippedList, game.skipped.map((p) => [p.title, '']), 'Nothing skipped');
+}
+
+function finishFixit(): void {
+  checker.cancel();
+  ui.input.disabled = true;
+  renderFixitEnd();
+  ui.practiceAgain.textContent = 'Repair another round';
+  // Fix-it has no topics, so that route off the shared sheet does not apply.
+  ui.practiceAnother.hidden = true;
+  show('practice-end');
+  ui.practiceAgain.focus();
+}
+
+/** Reuses the untimed end sheet, since the shape of the result is the same. */
+function renderFixitEnd(): void {
+  const session = fixitSession;
+  if (!session) return;
+
+  const repaired = session.completed.length;
+  ui.practiceFinalTitle.textContent =
+    repaired === fixitRoundTotal ? 'Every fault found' : 'Repairs finished';
+  ui.practiceFinalSummary.textContent =
+    repaired === 0
+      ? 'Nothing repaired this round. The source is wrong in exactly one place each time.'
+      : `${repaired} of ${fixitRoundTotal} ${repaired === 1 ? 'source' : 'sources'} repaired.`;
+
+  fill(
+    ui.practiceCompletedList,
+    session.completed.map(({ problem, mutator }) => [problem.title, mutator.summary]),
+    'Nothing repaired this round',
+  );
+  fill(
+    ui.practiceLaterList,
+    session.leftForLater.map(({ problem }) => [problem.title, '']),
+    'Nothing left behind',
+  );
 }
 
 function renderPracticeEnd(): void {
@@ -715,14 +875,19 @@ function fill(list: HTMLUListElement, rows: [string, string][], empty: string): 
 
 ui.practiceMode.addEventListener('click', openTopics);
 ui.blazeMode.addEventListener('click', chooseBlaze);
+ui.fixitMode.addEventListener('click', chooseFixit);
 ui.topicsHome.addEventListener('click', returnHome);
 ui.again.addEventListener('click', startBlaze);
 ui.endHome.addEventListener('click', returnHome);
-ui.practiceExit.addEventListener('click', openTopics);
+ui.practiceExit.addEventListener('click', () => {
+  if (activeMode === 'fixit') returnHome();
+  else openTopics();
+});
 ui.practiceAnother.addEventListener('click', openTopics);
 ui.practiceHome.addEventListener('click', returnHome);
 ui.practiceAgain.addEventListener('click', () => {
-  if (selectedTopic) startPractice(selectedTopic);
+  if (activeMode === 'fixit') startFixit();
+  else if (selectedTopic) startPractice(selectedTopic);
 });
 
 ui.tutorialInput.addEventListener('input', () => {

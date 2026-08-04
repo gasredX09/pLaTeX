@@ -11,6 +11,8 @@ import { blazeProblems } from './problems.js';
 import { practiceProblems } from './practiceProblems.js';
 import { normalize } from './normalize.js';
 import { BUNDLED_PACKAGES } from './tex/document.js';
+import { candidateBreaks } from './fixit.js';
+import { compareBitmaps } from './render/compare.js';
 
 const out = document.getElementById('log')!;
 const lines: string[] = [];
@@ -75,6 +77,8 @@ async function main(): Promise<void> {
   const seen = new Set<string>();
   const allowed = new Set<string>(BUNDLED_PACKAGES);
   const timings: number[] = [];
+  /** Problems whose leading mutation renders the target and is skipped at run time. */
+  const fellThrough: string[] = [];
 
   for (const problem of problems) {
     const issues: string[] = [];
@@ -105,6 +109,42 @@ async function main(): Promise<void> {
       const ink = inspectInk(image);
       if (!ink.any) issues.push('renders a blank page');
       if (ink.touchesEdge) issues.push('content runs off the page');
+
+      // Fix-it hands the player a generated mutation of this source, and at run
+      // time walks the candidates until one is genuinely wrong. That search is
+      // only guaranteed to terminate usefully if at least one candidate is a
+      // real puzzle, which is the invariant asserted here.
+      //
+      // It is not a formality: four problems have a leading mutation that
+      // compiles and still renders the target exactly, because dropping a final
+      // brace only leaves a group that closes at end of document, and a tie
+      // typesets like a space unless the line breaks there.
+      const candidates = candidateBreaks(problem);
+      if (candidates.length === 0) {
+        issues.push('cannot be broken, so Fix-it will never offer it');
+      } else {
+        let playable: string | null = null;
+        const noOps: string[] = [];
+        for (const candidate of candidates) {
+          const brokenResult = await engine.compile(normalize(candidate.source), problem.preamble);
+          if (brokenResult.status !== 'ok') {
+            playable = candidate.mutator.id;
+            break;
+          }
+          const brokenRender = await rasterizeFirstPage(brokenResult.pdf);
+          if (!compareBitmaps(image, brokenRender.image).match) {
+            playable = candidate.mutator.id;
+            break;
+          }
+          noOps.push(candidate.mutator.id);
+        }
+        if (!playable) {
+          issues.push(`every mutation reproduces the target: ${candidates.map((c) => c.mutator.id).join(', ')}`);
+        } else if (noOps.length > 0) {
+          // Not a failure; worth seeing which leading mutations fall through.
+          fellThrough.push(`${problem.id}: skipped ${noOps.join(', ')} -> used ${playable}`);
+        }
+      }
     }
 
     if (issues.length > 0) {
@@ -120,6 +160,10 @@ async function main(): Promise<void> {
   const median = Math.round(sorted[Math.floor(sorted.length / 2)] ?? 0);
   const slowest = Math.round(sorted.at(-1) ?? 0);
   log(`\nCompile time: median ${median}ms, slowest ${slowest}ms`);
+  if (fellThrough.length > 0) {
+    log(`\nFix-it fell through to a later mutation for ${fellThrough.length} problem(s):`);
+    for (const line of fellThrough) log(`  ${line}`);
+  }
   log(failed === 0 ? `ALL ${problems.length} PROBLEMS OK` : `${failed} PROBLEMS FAILED`);
 
   window.verifyFailed = failed;
