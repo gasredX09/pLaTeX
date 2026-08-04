@@ -18,7 +18,9 @@ import { buildDocument } from './document.js';
  * free to run. An absolute URL is fine; the engine treats the bases as opaque
  * and the origin only needs to permit cross-origin reads.
  */
-const TEX_BASE = (import.meta.env.VITE_TEX_BASE ?? '/tex').replace(/\/$/, '');
+const TEX_BASE = (
+  import.meta.env.VITE_TEX_BASE || `${import.meta.env.BASE_URL}tex`
+).replace(/\/$/, '');
 
 const ASSET_URLS = {
   bundlesUrl: `${TEX_BASE}/bundles`,

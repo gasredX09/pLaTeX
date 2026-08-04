@@ -14,15 +14,28 @@ BUCKET="${BUCKET:?set BUCKET to your R2 bucket name}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/public/tex"
 REMOTE_FLAG="${REMOTE_FLAG:---remote}"
 
-# Only the bundles the game actually resolves. The other 44 are ~130MB that no
-# problem in the set can reach. Re-derive this list by running
-# `npm run verify:problems` with verbose logging and reading "Required bundles",
-# and extend it whenever a problem adds a \usepackage.
-BUNDLES=(
-  amsmath core dvips extra-maps fmt-pdflatex fonts-cm fonts-cmextra
-  fonts-lm-tfm fonts-lm-type1 fonts-misc fonts-symbols graphics l3
-  pgf-tikz tables tex-latex-misc xcolor
+# Shared with fetch-tex-assets.sh so the deployed and uploaded sets cannot drift.
+BUNDLES=()
+while read -r b; do BUNDLES+=("$b"); done < <(
+  grep -vE '^\s*(#|$)' "$(dirname "${BASH_SOURCE[0]}")/required-bundles.txt"
 )
+
+# R2 has to be added to the account once in the dashboard before the API will
+# answer at all (it 403s with code 10042 until then), and the bucket has to exist
+# before objects can be put into it.
+if ! npx wrangler r2 bucket info "$BUCKET" >/dev/null 2>&1; then
+  echo "Bucket '$BUCKET' not found; creating it."
+  if ! npx wrangler r2 bucket create "$BUCKET"; then
+    cat >&2 <<'HINT'
+
+Could not create the bucket. If the error mentioned code 10042, R2 is not
+enabled on the account yet: Cloudflare dashboard -> Storage & databases ->
+R2 Object Storage -> Overview -> Add R2 subscription. Enabling it requires a
+payment method on file even though the 10GB/zero-egress tier costs nothing.
+HINT
+    exit 1
+  fi
+fi
 
 put() {
   local file="$1" key="$2" type="$3"

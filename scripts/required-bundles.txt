@@ -1,0 +1,34 @@
+# Package bundles the game can actually reach, one per line.
+#
+# The engine ships 61; these 17 are the ones any problem in the set resolves to.
+# The rest are ~130MB that nothing can load, so they are neither deployed nor
+# uploaded. Read by fetch-tex-assets.sh and upload-tex-assets.sh.
+#
+# To re-derive: run `npm run verify:problems`, whose log lines list the bundles
+# each compile requires. Extend this whenever a problem adds a \usepackage, or
+# that problem will fail to compile in production while passing locally.
+
+# engine and format
+core
+fmt-pdflatex
+l3
+dvips
+extra-maps
+
+# fonts
+fonts-cm
+fonts-cmextra
+fonts-lm-tfm
+fonts-lm-type1
+fonts-misc
+fonts-symbols
+
+# packages loaded by the shared preamble
+amsmath
+graphics
+tex-latex-misc
+xcolor
+tables
+
+# loaded only by the four TikZ problems, warmed in the background
+pgf-tikz

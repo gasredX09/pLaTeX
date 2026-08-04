@@ -1,9 +1,14 @@
 name: Deploy to GitHub Pages
 
-# The app is a few hundred KB and deploys here. The engine's ~50MB of wasm and
-# packages are NOT in this deployment: one file exceeds most static-host limits
-# and a first visit pulls ~50MB, so they live in object storage with no egress
-# charge. Point at them with the TEX_BASE repository variable.
+# Publishes the app together with the TeX engine, all same-origin, so there is no
+# second service to run and no CORS to configure.
+#
+# The engine's ~94MB is fetched from the CDN at build time rather than committed,
+# which keeps the repository small. Only the bundles in required-bundles.txt are
+# pulled: the other ~130MB is unreachable from the problem set.
+#
+# To serve the engine from object storage instead (no bandwidth ceiling), set the
+# TEX_BASE repository variable to its URL; the fetch step then skips itself.
 on:
   push:
     branches: [main]
@@ -30,6 +35,8 @@ jobs:
           node-version: 22
           cache: npm
 
+      - uses: actions/configure-pages@v5
+
       - run: npm ci
 
       - name: Check types and unit tests
@@ -37,27 +44,38 @@ jobs:
           npx tsc --noEmit
           npm test
 
-      # Only the worker script, which must be same-origin. The rest of the
-      # engine is served from TEX_BASE, so CI never downloads the 220MB.
+      # The worker must be same-origin, so it is always staged locally.
       - name: Stage the engine worker
         run: bash scripts/copy-worker.sh
 
+      # Skipped when TEX_BASE points the engine somewhere else.
+      - name: Fetch the TeX engine
+        if: ${{ !vars.TEX_BASE }}
+        run: bash scripts/fetch-tex-assets.sh --required
+
       - name: Build
         env:
-          # Repo variable, e.g. https://tex.example.com or the r2.dev URL.
-          # Falls back to /tex, which only works if the assets are served
-          # alongside the app.
+          # Unset by default, so the engine resolves to <base>/tex alongside the
+          # app. Set it to serve the engine from object storage instead.
           VITE_TEX_BASE: ${{ vars.TEX_BASE }}
           # A project page lives at /<repo>/; a user or custom-domain site at /.
           VITE_BASE: ${{ vars.PAGES_BASE || format('/{0}/', github.event.repository.name) }}
         run: npx vite build
+
+      - name: Report what is being published
+        run: |
+          echo "### Deploy contents" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          du -sh dist >> "$GITHUB_STEP_SUMMARY"
+          du -sh dist/tex 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       # Pages serves 404.html for unknown paths. The game is a single page, so
       # pointing that at the app keeps a stale or shared deep link playable.
       - name: Add 404 fallback
         run: cp dist/index.html dist/404.html
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 

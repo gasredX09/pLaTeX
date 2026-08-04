@@ -10,6 +10,8 @@ const crossOriginIsolation = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
 };
 
+const base = process.env.VITE_BASE ?? '/';
+
 /**
  * Serves the engine's *.data.gz package bundles as opaque bytes.
  *
@@ -22,8 +24,9 @@ const crossOriginIsolation = {
  * Any production host serving these files needs the same treatment.
  */
 function opaqueGzipBundles(): Plugin {
+  const bundlePrefix = `${base.replace(/\/$/, '')}/tex/bundles/`;
   const middleware = (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
-    if (req.url?.startsWith('/tex/bundles/') && req.url.includes('.data.gz')) {
+    if (req.url?.startsWith(bundlePrefix) && req.url.includes('.data.gz')) {
       const original = res.setHeader.bind(res);
       res.setHeader = ((name: string, value: never) => {
         if (name.toLowerCase() === 'content-encoding') return res;
@@ -48,7 +51,7 @@ function opaqueGzipBundles(): Plugin {
 export default defineConfig({
   // A GitHub project page is served from /<repo>/, so the built asset paths need
   // that prefix. Left as '/' for dev and for a site at a domain root.
-  base: process.env.VITE_BASE ?? '/',
+  base,
   plugins: [opaqueGzipBundles()],
   resolve: {
     alias: {
