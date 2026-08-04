@@ -1,8 +1,8 @@
 # pLaTeX
 
-Play + LaTeX. A speed-typesetting game in the spirit of
-[TeXnique](https://texnique.xyz/) but for **full LaTeX** rather than only maths.
-You get a printed page; reproduce it in LaTeX before the clock runs out.
+A LaTeX speed-typesetting game, in the spirit of [TeXnique](https://texnique.xyz/)
+but for **full LaTeX** rather than only maths. You get a printed page; reproduce
+it in LaTeX before the clock runs out.
 
 The wordmark is set with LaTeX's own logo kerning, with gentler pulls than the
 canonical ratios because the interface is monospaced. See `.logotype` in
@@ -27,6 +27,11 @@ can be authored in either spelling without becoming unsolvable.
 Scoring follows TeXnique: `ceil(source length / 10)` points per problem, three
 minutes per run, skipping costs only time.
 
+Your best run is kept in the browser's local storage, shown on the intro, beside
+the running score so you can see what you are chasing, and on the end sheet.
+There is no server, so the record is per browser and per device. A scoreless run
+is never recorded, and a tie does not count as beating it.
+
 ## Setup
 
 ```bash
@@ -50,6 +55,7 @@ npm run verify           # everything below, in order
 | `npm test` | Pure logic: scoring, normalization, pixel comparison, run state, hash shim |
 | `npm run smoke` | Engine init, cross-origin isolation, render determinism, equivalent-markup matching, near-miss rejection, recovery from a runaway macro |
 | `npm run verify:problems` | Every problem compiles, renders non-blank, fits one page, stays inside the margins, and loads only bundled packages |
+| `npm run verify:best` | The personal best across several runs: first record, missed record, beaten record, and survival of a reload |
 | `npm run verify:build` | The production bundle actually plays, from a cold cache |
 | `npm run shots` | Screenshots of every screen and state, for design review |
 
@@ -100,6 +106,7 @@ src/
   problems.ts          the problem set
   scoring.ts           ceil(len/10)                                  [tested]
   normalize.ts         equivalent-spelling rules                     [tested]
+  personalBest.ts      the stored record                             [tested]
   tex/
     document.ts        page geometry, preamble, allowed packages
     engine.ts          WASM engine: warm, compile, timeout, restart

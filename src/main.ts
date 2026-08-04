@@ -9,6 +9,13 @@ import { formatPoints } from './scoring.js';
 import { TexEngine } from './tex/engine.js';
 import { AttemptChecker, type CheckStatus } from './tex/compileQueue.js';
 import { paint } from './render/rasterize.js';
+import {
+  browserStorage,
+  readBest,
+  submitRun,
+  describeBest,
+  type BestRun,
+} from './personalBest.js';
 
 function need<T extends Element>(id: string): T {
   const el = document.getElementById(id);
@@ -42,12 +49,24 @@ const ui = {
   statusText: need<HTMLElement>('status-text'),
   skip: need<HTMLButtonElement>('skip'),
 
+  finalEyebrow: need<HTMLElement>('final-eyebrow'),
   finalScore: need<HTMLElement>('final-score'),
   finalSummary: need<HTMLElement>('final-summary'),
   solvedList: need<HTMLUListElement>('solved-list'),
   skippedList: need<HTMLUListElement>('skipped-list'),
   again: need<HTMLButtonElement>('again'),
+
+  introBest: need<HTMLElement>('intro-best'),
+  introBestValue: need<HTMLElement>('intro-best-value'),
+  railBest: need<HTMLElement>('rail-best'),
+  finalBest: need<HTMLElement>('final-best'),
+  finalBestLabel: need<HTMLElement>('final-best-label'),
+  finalBestValue: need<HTMLElement>('final-best-value'),
 };
+
+const storage = browserStorage();
+/** Cached so the rail can show it without touching storage every second. */
+let best: BestRun | null = readBest(storage);
 
 const game = new Game(problems);
 
@@ -85,6 +104,8 @@ void engine.warm().catch(() => {
   /* Surfaced through onStageChange. */
 });
 
+renderBest();
+
 // --------------------------------------------------------------- transitions
 
 function show(screen: 'intro' | 'play' | 'end'): void {
@@ -93,9 +114,19 @@ function show(screen: 'intro' | 'play' | 'end'): void {
   ui.end.hidden = screen !== 'end';
 }
 
+/** Shows the standing record wherever it appears, or hides it if there is none. */
+function renderBest(): void {
+  ui.introBest.hidden = !best;
+  ui.railBest.hidden = !best;
+  if (!best) return;
+  ui.introBestValue.textContent = describeBest(best);
+  ui.railBest.textContent = String(best.score);
+}
+
 function startRun(): void {
   game.start();
   show('play');
+  renderBest();
   renderRail();
   void loadCurrentProblem();
 
@@ -219,6 +250,29 @@ function renderEnd(): void {
     count === 0
       ? 'Nothing set this run. The engine is warm now, which helps.'
       : `${count} ${count === 1 ? 'problem' : 'problems'} set in three minutes.`;
+
+  // Record the run before reading the record back, so a new best is reflected
+  // here and on the intro when the player returns to it.
+  const previous = best;
+  const outcome = submitRun(storage, { score: game.score, solved: count });
+  best = outcome.best;
+
+  ui.finalEyebrow.textContent = outcome.isNewBest ? 'New personal best' : 'Time up';
+
+  // On a new best the headline score already *is* the record, so the line below
+  // shows what was beaten instead of repeating the same number back. With no
+  // record either way there is nothing to say.
+  const footnote = outcome.isNewBest
+    ? previous && { label: 'Previous best', run: previous }
+    : best && { label: 'Your best', run: best };
+
+  ui.finalBest.hidden = !footnote;
+  if (footnote) {
+    ui.finalBestLabel.textContent = footnote.label;
+    ui.finalBestValue.textContent = describeBest(footnote.run);
+  }
+
+  renderBest();
 
   fill(ui.solvedList, game.solved.map((s) => [s.problem.title, `+${s.points}`]), 'Nothing yet');
   fill(ui.skippedList, game.skipped.map((p) => [p.title, '']), 'Nothing skipped');

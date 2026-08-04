@@ -12,9 +12,10 @@
     "test:watch": "vitest",
     "smoke": "tsx scripts/smoke.ts",
     "verify:problems": "tsx scripts/verify-problems.ts",
-    "verify": "npm run test && npm run smoke && npm run verify:problems && npm run build && npm run verify:build",
+    "verify": "npm run test && npm run smoke && npm run verify:problems && npm run verify:best && npm run build && npm run verify:build",
     "shots": "tsx scripts/shots.ts",
-    "verify:build": "tsx scripts/verify-build.ts"
+    "verify:build": "tsx scripts/verify-build.ts",
+    "verify:best": "tsx scripts/verify-personal-best.ts"
   },
   "dependencies": {
     "@siglum/engine": "^0.1.4",

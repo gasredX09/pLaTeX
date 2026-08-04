@@ -218,6 +218,48 @@ code {
   flex-wrap: wrap;
 }
 
+/* The personal best, on the intro and the end sheet. Set as a ruled entry so it
+   reads as a record on file rather than a notification. */
+.record {
+  display: flex;
+  align-items: baseline;
+  gap: 1ch;
+  border-top: 1px solid var(--rule);
+  padding-top: 0.35rem;
+  margin: 0 0 calc(var(--step) * 3);
+}
+
+/* Any author `display` beats the UA stylesheet's [hidden] { display: none },
+   so every element toggled by the hidden attribute needs this restated. */
+.record[hidden] {
+  display: none;
+}
+
+/* The masthead already supplies the space below itself. */
+.masthead .record {
+  margin-bottom: 0;
+}
+
+.record .label {
+  flex: none;
+}
+
+.record-value {
+  font-family: var(--machine);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* Reads as "POINTS · BEST 12" beneath the running score. */
+.rail-best::before {
+  content: " · best ";
+}
+
+.rail-best[hidden] {
+  display: none;
+}
+
 .engine-status {
   font-family: var(--machine);
   font-size: 0.75rem;

@@ -11,7 +11,7 @@
     <!-- ------------------------------------------------------------ intro -->
     <section class="screen" id="intro">
       <header class="masthead">
-        <p class="eyebrow">Play + LaTeX</p>
+        <p class="eyebrow">A typesetting game</p>
         <h1 class="wordmark">
           <span class="logotype"
             >p<span class="logotype-l">L</span><span class="logotype-a">a</span>T<span
@@ -50,6 +50,11 @@
         </dl>
       </div>
 
+      <p class="record" id="intro-best" hidden>
+        <span class="label">Your best</span>
+        <span class="record-value" id="intro-best-value"></span>
+      </p>
+
       <div class="launch">
         <button class="button button-primary" id="start" disabled>
           Warming the type
@@ -78,7 +83,9 @@
         </div>
         <div class="rail-score">
           <span class="score-value" id="score">0</span>
-          <span class="label">points</span>
+          <span class="label"
+            >points<span class="rail-best" id="rail-best" hidden></span
+          ></span>
         </div>
       </div>
 
@@ -150,9 +157,13 @@
       </p>
 
       <header class="masthead">
-        <p class="eyebrow">Time up</p>
+        <p class="eyebrow" id="final-eyebrow">Time up</p>
         <h1 class="final-score"><span id="final-score">0</span> <small>points</small></h1>
         <p class="standfirst" id="final-summary"></p>
+        <p class="record" id="final-best" hidden>
+          <span class="label" id="final-best-label">Your best</span>
+          <span class="record-value" id="final-best-value"></span>
+        </p>
       </header>
 
       <div class="ledger">
