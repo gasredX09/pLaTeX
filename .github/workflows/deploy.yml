@@ -1,0 +1,72 @@
+name: Deploy to GitHub Pages
+
+# The app is a few hundred KB and deploys here. The engine's ~50MB of wasm and
+# packages are NOT in this deployment: one file exceeds most static-host limits
+# and a first visit pulls ~50MB, so they live in object storage with no egress
+# charge. Point at them with the TEX_BASE repository variable.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check types and unit tests
+        run: |
+          npx tsc --noEmit
+          npm test
+
+      # Only the worker script, which must be same-origin. The rest of the
+      # engine is served from TEX_BASE, so CI never downloads the 220MB.
+      - name: Stage the engine worker
+        run: bash scripts/copy-worker.sh
+
+      - name: Build
+        env:
+          # Repo variable, e.g. https://tex.example.com or the r2.dev URL.
+          # Falls back to /tex, which only works if the assets are served
+          # alongside the app.
+          VITE_TEX_BASE: ${{ vars.TEX_BASE }}
+          # A project page lives at /<repo>/; a user or custom-domain site at /.
+          VITE_BASE: ${{ vars.PAGES_BASE || format('/{0}/', github.event.repository.name) }}
+        run: npx vite build
+
+      # Pages serves 404.html for unknown paths. The game is a single page, so
+      # pointing that at the app keeps a stale or shared deep link playable.
+      - name: Add 404 fallback
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

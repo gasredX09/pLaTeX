@@ -7,6 +7,7 @@ import { Game, formatClock } from './game.js';
 import { problems } from './problems.js';
 import { formatPoints } from './scoring.js';
 import { TexEngine } from './tex/engine.js';
+import { PRELOAD_BUNDLES } from './tex/document.js';
 import { AttemptChecker, type CheckStatus } from './tex/compileQueue.js';
 import { paint } from './render/rasterize.js';
 import {
@@ -103,6 +104,10 @@ engine.onStageChange = (stage, detail) => {
 void engine.warm().catch(() => {
   /* Surfaced through onStageChange. */
 });
+
+// Then keep fetching the bundles only some problems need, so drawing one of
+// those does not stall the clock. Start is not gated on this.
+engine.preload(PRELOAD_BUNDLES);
 
 renderBest();
 

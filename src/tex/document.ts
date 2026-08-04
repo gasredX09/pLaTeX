@@ -29,15 +29,28 @@
 export const PAGE_WIDTH_MM = 80;
 export const PAGE_HEIGHT_MM = 32;
 
+/*
+ * Kept deliberately thin, because the shared preamble is a bandwidth decision as
+ * much as a typesetting one. The engine fetches a whole package bundle for each
+ * \usepackage it sees, on every player's first compile, so a package loaded here
+ * "just in case" is paid for by everyone:
+ *
+ *   \usepackage{tikz}      pulls pgf-tikz, 30.6MB, wanted by 4 problems
+ *   \usepackage{tabularx}  pulls tables,   15.8MB, wanted by none
+ *
+ * tikz therefore lives on the problems that use it, and tabularx is gone: the
+ * table problems use plain tabular, and both tabular and array come from `core`,
+ * which is loaded regardless. graphicx went the same way, unused.
+ *
+ * xcolor stays. It is 0.1MB, and its one dependency outside that (colortbl) sits
+ * in tex-latex-misc, which `geometry` already brings in.
+ */
 export const PREAMBLE = String.raw`
 \usepackage[paperwidth=${PAGE_WIDTH_MM}mm,paperheight=${PAGE_HEIGHT_MM}mm,margin=3mm]{geometry}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{array}
-\usepackage{tabularx}
-\usepackage{graphicx}
 \usepackage{xcolor}
-\usepackage{tikz}
 \pagestyle{empty}
 \setlength{\parindent}{0pt}
 `.trim();
@@ -63,6 +76,13 @@ export const BUNDLED_PACKAGES = [
   'siunitx',
   'pifont',
 ] as const;
+
+/**
+ * Bundles worth fetching in the background once the engine is up: needed by some
+ * problems, too big to make everyone wait for before the first compile.
+ * pgf-tikz is 30.6MB and four problems use it.
+ */
+export const PRELOAD_BUNDLES = ['pgf-tikz'];
 
 export function buildDocument(body: string, extraPreamble?: string): string {
   return [

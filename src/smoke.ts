@@ -30,8 +30,8 @@ function check(name: string, ok: boolean, detail = ''): void {
   log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
 }
 
-async function render(body: string): Promise<ImageData | null> {
-  const result = await engine.compile(body);
+async function render(body: string, extraPreamble?: string): Promise<ImageData | null> {
+  const result = await engine.compile(body, extraPreamble);
   if (result.status !== 'ok') {
     log(`   compile ${result.status}: ${result.status === 'error' ? result.log.slice(0, 400) : ''}`);
     return null;
@@ -94,10 +94,22 @@ async function main(): Promise<void> {
   const list = await render(String.raw`\begin{itemize}\item One\item Two\end{itemize}`);
   check('itemize', list !== null);
 
+  // tikz is deliberately not in the shared preamble (its bundle is 30.6MB), so
+  // this passes it the way the TikZ problems do.
   const tikz = await render(
     String.raw`\begin{tikzpicture}\draw[thick,red] (0,0) circle (0.5cm);\end{tikzpicture}`,
+    String.raw`\usepackage{tikz}`,
   );
-  check('tikz picture', tikz !== null);
+  check('tikz picture with a per-problem preamble', tikz !== null);
+
+  const tikzUnavailable = await engine.compile(
+    String.raw`\begin{tikzpicture}\draw (0,0) circle (1cm);\end{tikzpicture}`,
+  );
+  check(
+    'tikz is absent from the shared preamble',
+    tikzUnavailable.status === 'error',
+    tikzUnavailable.status,
+  );
 
   const color = await render(String.raw`\textcolor{blue}{blue text}`);
   check('xcolor', color !== null);

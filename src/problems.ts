@@ -4,12 +4,17 @@
  * Each `latex` is a document *body*, compiled inside the template in
  * tex/document.ts. Authoring rules:
  *
- *  - It must fit a 100x60mm page with 4mm margins (roughly 45 characters wide
- *    by 8 lines at 11pt). Only page one is compared, so overflow is invisible
+ *  - It must fit an 80x32mm page with 3mm margins (roughly 45 characters wide
+ *    by 6 lines at 11pt). Only page one is compared, so overflow is invisible
  *    and confusing.
  *  - It may only use packages listed in BUNDLED_PACKAGES. In particular
  *    `booktabs`, `enumitem`, `ulem`, `cancel` and `stmaryrd` are NOT available:
  *    they are absent from the engine's bundles and would need a network fetch.
+ *  - Anything beyond the shared preamble goes in this problem's own `preamble`,
+ *    not into the shared one. The engine downloads a whole package bundle per
+ *    \usepackage on a player's first compile, so a package in the shared
+ *    preamble is paid for by every player. `tikz` alone is 30.6MB, which is why
+ *    the four TikZ problems declare it themselves.
  *  - Prefer the canonical spelling of anything normalize.ts rewrites, so the
  *    target reads naturally.
  *  - `title` and `description` are plain text, not LaTeX. They are set with
@@ -328,6 +333,7 @@ Below`,
     latex: String.raw`\begin{tikzpicture}
   \draw[thick, red] (0,0) circle (1cm);
 \end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
   },
   {
     id: 'tikz-arrow',
@@ -336,6 +342,7 @@ Below`,
     latex: String.raw`\begin{tikzpicture}
   \draw[->] (0,0) -- (3,0);
 \end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
   },
   {
     id: 'tikz-rectangle',
@@ -344,6 +351,7 @@ Below`,
     latex: String.raw`\begin{tikzpicture}
   \draw[fill=blue!30] (0,0) rectangle (2,1);
 \end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
   },
   {
     id: 'tikz-node',
@@ -352,6 +360,7 @@ Below`,
     latex: String.raw`\begin{tikzpicture}
   \node[draw, circle] at (0,0) {$x$};
 \end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
   },
 
   // ----------------------------------------------------------- structure ---

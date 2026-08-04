@@ -95,20 +95,54 @@ if you can, but their absence is a performance note, not a blocker.
 
 | | |
 | --- | --- |
-| Deployed assets | ~94MB (29MB wasm, 63MB bundles, 1.6MB manifests) |
-| Transferred on a first visit | ~96MB across 29 requests, ~77MB if the host brotlis the wasm |
+| The app | **1.9MB**, 7 files |
+| The engine | ~94MB (29MB wasm, 63MB bundles, 1.6MB manifests) |
+| Transferred on a first visit | ~50MB across 27 requests, ~30MB if the host brotlis the wasm |
 | Transferred on later visits | nothing; the engine caches to browser storage |
 
-Only 17 of the 61 bundles are ever fetched, so the other ~130MB need not be
-deployed. Of what is fetched, `pgf-tikz` (30.6MB) and `tables` (15.8MB) are
-nearly half, and both are pulled in by the shared preamble in
-`src/tex/document.ts` on *every* visit, including for a plain-text problem.
-Moving those `\usepackage` lines onto the handful of problems that need them
-would cut the common first visit by roughly 60%.
+Only 17 of the 61 bundles are reachable, so the other ~130MB need not be
+deployed at all.
 
-At ~77MB per new player, a host with a 100GB monthly cap supports on the order of
-1,300 new players a month. Object storage with no egress charge is the way to
-avoid that ceiling.
+The shared preamble is a bandwidth decision as much as a typesetting one, because
+the engine fetches a whole bundle per `\usepackage` on a player's first compile.
+`tikz` alone pulls 30.6MB, so it sits on the four problems that draw with it and
+is warmed in the background after startup; `tabularx` pulled 15.8MB for nothing
+and is gone. That took a first visit from ~96MB to ~50MB. `src/tex/document.test.ts`
+guards against the packages creeping back.
+
+### Deploying
+
+The app and the engine want different hosts. The app is small enough for anything;
+the engine has a 29MB file, which exceeds the 25 MiB per-file limit on Cloudflare
+Pages, and at ~30MB per new player a 100GB monthly cap is about 3,000 players.
+Object storage with no egress charge removes both problems.
+
+The split is config, not surgery, and is verified working cross-origin:
+
+```bash
+# 1. Engine to an R2 bucket. Uploads only the 17 reachable bundles, and sets
+#    content types with no Content-Encoding.
+npx wrangler login
+BUCKET=platex-tex npm run upload:tex
+
+# 2. Enable public reads on the bucket (custom domain preferred over r2.dev,
+#    which is rate limited), and add a CORS rule allowing your app's origin.
+
+# 3. Point the app at it. On GitHub Pages, set the repository variable
+#    TEX_BASE and push; .github/workflows/deploy.yml does the rest.
+VITE_TEX_BASE=https://tex.example.com npm run build
+```
+
+Two build-time variables:
+
+| | |
+| --- | --- |
+| `VITE_TEX_BASE` | Where the wasm and bundles are served from. Defaults to `/tex`, which only works if they sit beside the app. |
+| `VITE_BASE` | Path prefix. A GitHub *project* page is served from `/<repo>/`; a user or custom-domain site from `/`. |
+
+`public/tex/worker.js` always stays on the app's own origin, because a worker
+script cannot be cross-origin. `npm run setup:worker` copies it out of
+`node_modules`, so CI never downloads the 220MB.
 
 ## Adding problems
 

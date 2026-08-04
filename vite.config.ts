@@ -46,6 +46,9 @@ function opaqueGzipBundles(): Plugin {
 }
 
 export default defineConfig({
+  // A GitHub project page is served from /<repo>/, so the built asset paths need
+  // that prefix. Left as '/' for dev and for a site at a domain root.
+  base: process.env.VITE_BASE ?? '/',
   plugins: [opaqueGzipBundles()],
   resolve: {
     alias: {
