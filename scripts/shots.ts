@@ -5,6 +5,7 @@
 import { chromium, type Page } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { startServer } from './server.js';
+import { TUTORIAL } from '../src/onboarding.js';
 
 const server = process.env.SHOT_URL ? null : await startServer();
 const BASE = process.env.SHOT_URL ?? server!.url;
@@ -51,32 +52,64 @@ await page.screenshot({ path: `${OUT}/2-intro-ready.png` });
 
 await page.click('#start');
 await page.waitForFunction(
+  () => (document.getElementById('tutorial-target-canvas') as HTMLCanvasElement).width > 0,
+  null,
+  { timeout: 60_000 },
+);
+await page.screenshot({ path: `${OUT}/3-tutorial-fresh.png` });
+
+await page.fill('#tutorial-input', 'Hello');
+await page.waitForFunction(
+  () => document.getElementById('tutorial-status')?.className.includes('mismatch') ?? false,
+  null,
+  { timeout: 60_000 },
+);
+await page.screenshot({ path: `${OUT}/4-tutorial-mismatch.png` });
+
+await page.fill('#tutorial-input', '\\frac{1');
+await page.waitForFunction(
+  () => document.getElementById('tutorial-status')?.className.includes('invalid') ?? false,
+  null,
+  { timeout: 60_000 },
+);
+await page.screenshot({ path: `${OUT}/5-tutorial-invalid.png` });
+
+await page.fill('#tutorial-input', TUTORIAL.latex);
+await page.waitForFunction(
+  () => document.getElementById('tutorial-status')?.className.includes('match') ?? false,
+  null,
+  { timeout: 60_000 },
+);
+await page.screenshot({ path: `${OUT}/6-tutorial-match.png` });
+
+await page.click('#tutorial-continue');
+await page.waitForFunction(
   () => (document.getElementById('target-canvas') as HTMLCanvasElement).width > 0,
   null,
   { timeout: 60_000 },
 );
-await page.screenshot({ path: `${OUT}/3-play-fresh.png` });
+await page.screenshot({ path: `${OUT}/7-play-fresh.png` });
 
 await page.fill('#input', 'Hello');
 await waitForStatus(page, 'mismatch');
-await page.screenshot({ path: `${OUT}/4-play-mismatch.png` });
+await page.screenshot({ path: `${OUT}/8-play-mismatch.png` });
 
 await page.fill('#input', '\\frac{1');
 await waitForStatus(page, 'invalid');
-await page.screenshot({ path: `${OUT}/5-play-invalid.png` });
+await page.screenshot({ path: `${OUT}/9-play-invalid.png` });
 
 await page.fill('#input', await currentAnswer(page));
 await waitForStatus(page, 'match');
-await page.screenshot({ path: `${OUT}/6-play-match.png` });
+await page.screenshot({ path: `${OUT}/10-play-match.png` });
 
 await page.setViewportSize({ width: 430, height: 950 });
-await page.screenshot({ path: `${OUT}/7-play-narrow.png` });
+await page.screenshot({ path: `${OUT}/11-play-narrow.png` });
 await page.setViewportSize({ width, height });
 
 await page.waitForSelector('#end:not([hidden])', { timeout: 40_000 });
 // Let the screen's entrance animation finish, or the shot catches it mid-fade.
 await page.waitForTimeout(600);
-await page.screenshot({ path: `${OUT}/8-end.png` });
+await page.screenshot({ path: `${OUT}/12-end.png` });
 
 await browser.close();
 await server?.close();

@@ -38,11 +38,17 @@ async function isHidden(selector: string): Promise<boolean> {
   return page.locator(selector).isHidden();
 }
 
+/** Starts the clock, skipping the first-run warm-up when it appears. */
+async function startTimedRun(): Promise<void> {
+  await page.click('#start');
+  if (await page.locator('#tutorial').isVisible()) await page.click('#tutorial-skip');
+}
+
 /** Loads a fresh round of `seconds`, then solves `count` problems. */
 async function playRound(seconds: number, count: number): Promise<void> {
   await page.goto(`${base}?seconds=${seconds}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#start:not([disabled])', { timeout: 180_000 });
-  await page.click('#start');
+  await startTimedRun();
 
   for (let i = 0; i < count; i++) {
     await page.waitForFunction(
@@ -98,7 +104,7 @@ try {
   // Solve nothing, so the run scores zero and cannot beat anything.
   await page.goto(`${base}?seconds=6`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#start:not([disabled])', { timeout: 180_000 });
-  await page.click('#start');
+  await startTimedRun();
   await page.waitForSelector('#end:not([hidden])', { timeout: 60_000 });
   check('a scoreless run does not claim the record', (await text('#final-eyebrow')) === 'Time up');
   check('the standing record is shown instead', !(await isHidden('#final-best')));
@@ -140,7 +146,7 @@ try {
   // --- The rail shows the target during play -----------------------------
   await page.goto(`${base}?seconds=30`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#start:not([disabled])', { timeout: 180_000 });
-  await page.click('#start');
+  await startTimedRun();
   check('the rail shows the record to beat', !(await isHidden('#rail-best')));
   check('the rail figure is the record', (await text('#rail-best')) === String(third));
 } catch (err) {

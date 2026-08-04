@@ -27,6 +27,10 @@ can be authored in either spelling without becoming unsolvable.
 Scoring follows TeXnique: `ceil(source length / 10)` points per problem, three
 minutes per run, skipping costs only time.
 
+The first run begins with a no-clock warm-up that shows the source to type and
+teaches the compile, preview, and registration loop. Completion is stored in the
+browser so returning players go straight to the clock.
+
 Your best run is kept in the browser's local storage, shown on the intro, beside
 the running score so you can see what you are chasing, and on the end sheet.
 There is no server, so the record is per browser and per device. A scoreless run
@@ -139,10 +143,27 @@ Two build-time variables:
 | --- | --- |
 | `VITE_TEX_BASE` | Where the wasm and bundles are served from. Defaults to `/tex`, which only works if they sit beside the app. |
 | `VITE_BASE` | Path prefix. A GitHub *project* page is served from `/<repo>/`; a user or custom-domain site from `/`. |
+| `VITE_TELEMETRY_ENDPOINT` | Optional HTTPS endpoint for sanitized reliability events. Empty disables telemetry. |
 
 `public/tex/worker.js` always stays on the app's own origin, because a worker
 script cannot be cross-origin. `npm run setup:worker` copies it out of
 `node_modules`, so CI never downloads the 220MB.
+
+### Optional reliability telemetry
+
+Set the `TELEMETRY_ENDPOINT` repository variable to enable error reporting in
+the Pages build. The browser sends small JSON `POST` requests for engine warm-up
+failures, compile timeouts, target authoring failures, and unexpected errors.
+The collector must accept cross-origin requests.
+
+The payload is intentionally narrow. It contains a schema number, event name,
+an error category, and a problem ID when a target fails. It never contains the
+player's LaTeX, rendered content, score, personal best, browser details,
+timestamp, or a persistent identifier. With no endpoint configured, the app
+makes no telemetry requests. It also disables telemetry when Global Privacy
+Control or Do Not Track is enabled. The collector will still receive ordinary
+network metadata such as an IP address, so its retention policy remains part of
+the deployment's privacy posture.
 
 ## Adding problems
 
@@ -168,9 +189,12 @@ src/
   scoring.ts           ceil(len/10)                                  [tested]
   normalize.ts         equivalent-spelling rules                     [tested]
   personalBest.ts      the stored record                             [tested]
+  onboarding.ts        first-run tutorial state and exercise          [tested]
+  telemetry.ts         optional sanitized reliability events          [tested]
   tex/
     document.ts        page geometry, preamble, allowed packages
     engine.ts          WASM engine: warm, compile, timeout, restart
+    warmProgress.ts    coarse cold-start milestones                    [tested]
     compileQueue.ts    debounce, drop stale results, compare
     blake3-shim.ts     replaces an unbundlable dependency            [tested]
   render/

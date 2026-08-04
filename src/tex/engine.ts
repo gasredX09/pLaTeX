@@ -7,6 +7,7 @@
  */
 import { SiglumCompiler } from '@siglum/engine';
 import { buildDocument } from './document.js';
+import { warmMilestone } from './warmProgress.js';
 
 /**
  * Where the engine's ~50MB of wasm and packages live.
@@ -59,17 +60,27 @@ export interface TexEngineOptions {
 export class TexEngine {
   private compiler: SiglumCompiler | null = null;
   private ready: Promise<void> | null = null;
+  private warmPercent = 0;
   /** Serializes compiles: the engine holds a single pending-compile slot. */
   private queue: Promise<unknown> = Promise.resolve();
 
   stage: EngineStage = 'idle';
-  onStageChange: (stage: EngineStage, detail?: string) => void = () => {};
+  onStageChange: (stage: EngineStage, detail?: string, percent?: number) => void = () => {};
 
   constructor(private readonly options: TexEngineOptions = {}) {}
 
-  private setStage(stage: EngineStage, detail?: string): void {
+  private setStage(stage: EngineStage, detail?: string, percent?: number): void {
     this.stage = stage;
-    this.onStageChange(stage, detail);
+    this.onStageChange(stage, detail, percent);
+  }
+
+  private trackLog(message: string): void {
+    this.options.onLog?.(message);
+    if (this.stage !== 'loading') return;
+    const milestone = warmMilestone(message);
+    if (!milestone || milestone.percent <= this.warmPercent) return;
+    this.warmPercent = milestone.percent;
+    this.setStage('loading', milestone.detail, milestone.percent);
   }
 
   private create(): SiglumCompiler {
@@ -83,9 +94,11 @@ export class TexEngine {
       // With no CTAN and a fixed preamble there is nothing worth retrying much.
       maxRetries: 3,
       verbose: this.options.verbose ?? false,
-      onLog: this.options.onLog ?? (() => {}),
+      onLog: (message) => this.trackLog(message),
       onProgress: (stageName, detail) => {
-        if (this.stage === 'loading') this.setStage('loading', `${stageName} ${detail}`);
+        if (this.stage === 'loading') {
+          this.setStage('loading', `${stageName} ${detail}`, this.warmPercent);
+        }
       },
     });
   }
@@ -97,11 +110,15 @@ export class TexEngine {
    */
   warm(): Promise<void> {
     if (!this.ready) {
-      this.setStage('loading');
+      this.warmPercent = 5;
+      this.setStage('loading', 'Checking the browser cache', this.warmPercent);
       this.compiler = this.create();
       this.ready = this.compiler
         .init()
-        .then(() => this.setStage('ready'))
+        .then(() => {
+          this.warmPercent = 100;
+          this.setStage('ready', undefined, this.warmPercent);
+        })
         .catch((err: unknown) => {
           this.setStage('failed', err instanceof Error ? err.message : String(err));
           throw err;

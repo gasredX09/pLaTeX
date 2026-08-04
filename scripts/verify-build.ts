@@ -10,6 +10,7 @@
  */
 import { chromium } from 'playwright';
 import { preview } from 'vite';
+import { TUTORIAL } from '../src/onboarding.js';
 
 const server = await preview({
   configFile: new URL('../vite.config.ts', import.meta.url).pathname,
@@ -45,6 +46,23 @@ try {
   check('engine warms from a cold cache', true, `${Date.now() - warmStart}ms`);
 
   await page.click('#start');
+  if (await page.locator('#tutorial').isVisible()) {
+    await page.waitForFunction(
+      () => (document.getElementById('tutorial-target-canvas') as HTMLCanvasElement).width > 0,
+      null,
+      { timeout: 60_000 },
+    );
+    check('tutorial target renders', true);
+    await page.fill('#tutorial-input', TUTORIAL.latex);
+    await page.waitForFunction(
+      () => document.getElementById('tutorial-status')?.className.includes('match') ?? false,
+      null,
+      { timeout: 60_000 },
+    );
+    check('tutorial accepts the suggested source', true);
+    await page.click('#tutorial-continue');
+  }
+
   await page.waitForFunction(
     () => (document.getElementById('target-canvas') as HTMLCanvasElement).width > 0,
     null,

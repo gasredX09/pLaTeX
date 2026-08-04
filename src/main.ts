@@ -8,8 +8,15 @@ import { problems } from './problems.js';
 import { formatPoints } from './scoring.js';
 import { TexEngine } from './tex/engine.js';
 import { PRELOAD_BUNDLES } from './tex/document.js';
+import { FIRST_VISIT_MB } from './tex/warmProgress.js';
 import { AttemptChecker, type CheckStatus } from './tex/compileQueue.js';
 import { paint } from './render/rasterize.js';
+import {
+  completeTutorial,
+  hasCompletedTutorial,
+  TUTORIAL,
+} from './onboarding.js';
+import { classifyError, telemetry } from './telemetry.js';
 import {
   browserStorage,
   readBest,
@@ -17,6 +24,16 @@ import {
   describeBest,
   type BestRun,
 } from './personalBest.js';
+
+window.addEventListener('error', (event) => {
+  telemetry.report({
+    event: 'unexpected_error',
+    reason: classifyError(event.error ?? event.message),
+  });
+});
+window.addEventListener('unhandledrejection', (event) => {
+  telemetry.report({ event: 'unexpected_error', reason: classifyError(event.reason) });
+});
 
 function need<T extends Element>(id: string): T {
   const el = document.getElementById(id);
@@ -26,11 +43,26 @@ function need<T extends Element>(id: string): T {
 
 const ui = {
   intro: need<HTMLElement>('intro'),
+  tutorial: need<HTMLElement>('tutorial'),
   play: need<HTMLElement>('play'),
   end: need<HTMLElement>('end'),
 
   start: need<HTMLButtonElement>('start'),
   engineStatus: need<HTMLParagraphElement>('engine-status'),
+  engineNote: need<HTMLParagraphElement>('engine-note'),
+  engineProgress: need<HTMLProgressElement>('engine-progress'),
+
+  tutorialTitle: need<HTMLElement>('tutorial-title'),
+  tutorialDescription: need<HTMLElement>('tutorial-description'),
+  tutorialHint: need<HTMLElement>('tutorial-hint'),
+  tutorialTargetCanvas: need<HTMLCanvasElement>('tutorial-target-canvas'),
+  tutorialAttemptCanvas: need<HTMLCanvasElement>('tutorial-attempt-canvas'),
+  tutorialRegistration: need<HTMLElement>('tutorial-registration'),
+  tutorialInput: need<HTMLTextAreaElement>('tutorial-input'),
+  tutorialStatus: need<HTMLElement>('tutorial-status'),
+  tutorialStatusText: need<HTMLElement>('tutorial-status-text'),
+  tutorialSkip: need<HTMLButtonElement>('tutorial-skip'),
+  tutorialContinue: need<HTMLButtonElement>('tutorial-continue'),
 
   clock: need<HTMLElement>('clock'),
   clockFill: need<HTMLElement>('clock-fill'),
@@ -68,6 +100,7 @@ const ui = {
 const storage = browserStorage();
 /** Cached so the rail can show it without touching storage every second. */
 let best: BestRun | null = readBest(storage);
+let tutorialComplete = hasCompletedTutorial(storage);
 
 const game = new Game(problems);
 
@@ -80,25 +113,52 @@ if (import.meta.env.DEV) {
 
 const engine = new TexEngine();
 const checker = new AttemptChecker(engine, onCheckOutcome);
+const tutorialChecker = new AttemptChecker(engine, onTutorialOutcome);
 
 let clockTimer: ReturnType<typeof setInterval> | undefined;
 /** Guards against a late compile scoring a problem twice. */
 let awaitingAdvance = false;
+const warmStartedAt = performance.now();
+let warmDetail = 'Checking the browser cache';
+let warmPercent = 5;
+const warmClock = setInterval(() => {
+  if (engine.stage === 'loading') renderWarmProgress();
+}, 1_000);
 
 // ------------------------------------------------------------------- engine
 
-engine.onStageChange = (stage, detail) => {
+engine.onStageChange = (stage, detail, percent) => {
   if (stage === 'ready') {
+    clearInterval(warmClock);
     ui.start.disabled = false;
-    ui.start.textContent = 'Start the clock';
-    ui.engineStatus.textContent = 'TeX Live ready. Cached for next time.';
+    ui.start.textContent = tutorialComplete ? 'Start the clock' : 'Try a warm-up';
+    ui.engineProgress.value = 100;
+    const seconds = (performance.now() - warmStartedAt) / 1_000;
+    const duration = seconds < 1 ? 'under a second' : `${seconds.toFixed(1)}s`;
+    ui.engineStatus.textContent = `TeX Live ready in ${duration}.`;
+    ui.engineNote.textContent =
+      'This browser will reuse the engine files when storage is available.';
   } else if (stage === 'failed') {
+    clearInterval(warmClock);
     ui.start.textContent = 'Engine unavailable';
     ui.engineStatus.textContent = `Could not load the TeX engine: ${detail ?? 'unknown error'}. Reload to try again.`;
+    ui.engineNote.textContent = 'Check the connection and browser storage, then reload.';
+    telemetry.report({ event: 'engine_warm_failed', reason: classifyError(detail) });
   } else if (stage === 'loading' && detail) {
-    ui.engineStatus.textContent = detail;
+    warmDetail = detail;
+    warmPercent = Math.max(warmPercent, percent ?? warmPercent);
+    renderWarmProgress();
   }
 };
+
+function renderWarmProgress(): void {
+  const seconds = Math.floor((performance.now() - warmStartedAt) / 1_000);
+  const elapsed = seconds > 0 ? ` · ${seconds}s` : '';
+  ui.engineProgress.value = warmPercent;
+  ui.engineStatus.textContent = `${warmDetail} · ${warmPercent}%${elapsed}`;
+  ui.engineNote.textContent =
+    `First visit: about ${FIRST_VISIT_MB} MB. Later visits reuse browser storage.`;
+}
 
 // Download and warm behind the intro screen, so the wait overlaps with reading.
 void engine.warm().catch(() => {
@@ -113,8 +173,9 @@ renderBest();
 
 // --------------------------------------------------------------- transitions
 
-function show(screen: 'intro' | 'play' | 'end'): void {
+function show(screen: 'intro' | 'tutorial' | 'play' | 'end'): void {
   ui.intro.hidden = screen !== 'intro';
+  ui.tutorial.hidden = screen !== 'tutorial';
   ui.play.hidden = screen !== 'play';
   ui.end.hidden = screen !== 'end';
 }
@@ -128,7 +189,53 @@ function renderBest(): void {
   ui.railBest.textContent = String(best.score);
 }
 
+function beginFromIntro(): void {
+  if (tutorialComplete) startRun();
+  else void startTutorial();
+}
+
+async function startTutorial(): Promise<void> {
+  show('tutorial');
+  ui.tutorialTitle.textContent = TUTORIAL.title;
+  ui.tutorialDescription.textContent = TUTORIAL.description;
+  ui.tutorialHint.textContent = TUTORIAL.latex;
+  ui.tutorialInput.value = '';
+  ui.tutorialInput.disabled = true;
+  ui.tutorialContinue.disabled = true;
+  ui.tutorialContinue.textContent = 'Match the target to continue';
+  clearCanvas(ui.tutorialTargetCanvas);
+  clearCanvas(ui.tutorialAttemptCanvas);
+  setTutorialStatus('compiling', 'Preparing the warm-up target');
+
+  const target = await tutorialChecker.setProblem(TUTORIAL.latex);
+  if (ui.tutorial.hidden) return;
+  if (!target) {
+    telemetry.report({ event: 'target_compile_failed', problem: 'tutorial' });
+    setTutorialStatus('invalid', 'Warm-up unavailable. Start the timed run instead.');
+    ui.tutorialContinue.disabled = false;
+    ui.tutorialContinue.textContent = 'Start the timed run';
+    return;
+  }
+
+  paint(ui.tutorialTargetCanvas, target);
+  ui.tutorialInput.disabled = false;
+  setTutorialStatus('idle');
+  ui.tutorialInput.focus();
+}
+
+function rememberTutorial(): void {
+  tutorialComplete = true;
+  completeTutorial(storage);
+}
+
+function leaveTutorial(): void {
+  tutorialChecker.cancel();
+  rememberTutorial();
+  startRun();
+}
+
 function startRun(): void {
+  tutorialChecker.cancel();
   game.start();
   show('play');
   renderBest();
@@ -188,6 +295,7 @@ async function loadCurrentProblem(): Promise<void> {
   if (!target) {
     // An authoring bug rather than anything the player did. Do not burn their
     // clock on an unsolvable problem.
+    telemetry.report({ event: 'target_compile_failed', problem: problem.id });
     setStatus('invalid', 'This problem failed to compile. Skipping.');
     advance(() => game.skip());
     return;
@@ -219,6 +327,34 @@ function setStatus(status: CheckStatus, override?: string): void {
   ui.registration.className = `registration is-${status}`;
 }
 
+function setTutorialStatus(status: CheckStatus, override?: string): void {
+  ui.tutorialStatusText.textContent = override ?? STATUS_TEXT[status];
+  ui.tutorialStatus.className = `status is-${status}`;
+  ui.tutorialRegistration.className = `registration is-${status}`;
+}
+
+function onTutorialOutcome({
+  status,
+  image,
+}: {
+  status: CheckStatus;
+  image?: ImageData;
+}): void {
+  if (ui.tutorial.hidden) return;
+  setTutorialStatus(status);
+  if (image) paint(ui.tutorialAttemptCanvas, image);
+  else if (status === 'idle' || status === 'invalid') clearCanvas(ui.tutorialAttemptCanvas);
+
+  if (status === 'timeout') telemetry.report({ event: 'compile_timeout' });
+  if (status === 'match') {
+    ui.tutorialInput.disabled = true;
+    rememberTutorial();
+    ui.tutorialContinue.disabled = false;
+    ui.tutorialContinue.textContent = 'Start the three-minute run';
+    ui.tutorialContinue.focus();
+  }
+}
+
 function onCheckOutcome({ status, image }: { status: CheckStatus; image?: ImageData }): void {
   if (game.status !== 'running' || awaitingAdvance) return;
 
@@ -226,6 +362,7 @@ function onCheckOutcome({ status, image }: { status: CheckStatus; image?: ImageD
   if (image) paint(ui.attemptCanvas, image);
   else if (status === 'idle' || status === 'invalid') clearCanvas(ui.attemptCanvas);
 
+  if (status === 'timeout') telemetry.report({ event: 'compile_timeout' });
   if (status === 'match') {
     ui.input.disabled = true;
     advance(() => game.solve());
@@ -305,8 +442,15 @@ function fill(list: HTMLUListElement, rows: [string, string][], empty: string): 
 
 // ------------------------------------------------------------------- events
 
-ui.start.addEventListener('click', startRun);
+ui.start.addEventListener('click', beginFromIntro);
 ui.again.addEventListener('click', startRun);
+
+ui.tutorialInput.addEventListener('input', () => {
+  tutorialChecker.update(ui.tutorialInput.value);
+});
+
+ui.tutorialSkip.addEventListener('click', leaveTutorial);
+ui.tutorialContinue.addEventListener('click', leaveTutorial);
 
 ui.input.addEventListener('input', () => {
   if (game.status !== 'running' || awaitingAdvance) return;
@@ -319,11 +463,23 @@ ui.skip.addEventListener('click', () => {
 });
 
 // A tab in the editor should indent, not leave for the Skip button.
-ui.input.addEventListener('keydown', (event) => {
+function indentEditor(
+  event: KeyboardEvent,
+  input: HTMLTextAreaElement,
+  attemptChecker: AttemptChecker,
+): void {
   if (event.key !== 'Tab' || event.shiftKey) return;
   event.preventDefault();
-  const { selectionStart, selectionEnd, value } = ui.input;
-  ui.input.value = `${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`;
-  ui.input.selectionStart = ui.input.selectionEnd = selectionStart + 2;
-  checker.update(ui.input.value);
+  const { selectionStart, selectionEnd, value } = input;
+  input.value = `${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`;
+  input.selectionStart = input.selectionEnd = selectionStart + 2;
+  attemptChecker.update(input.value);
+}
+
+ui.input.addEventListener('keydown', (event) => {
+  indentEditor(event, ui.input, checker);
+});
+
+ui.tutorialInput.addEventListener('keydown', (event) => {
+  indentEditor(event, ui.tutorialInput, tutorialChecker);
 });

@@ -58,6 +58,8 @@ jobs:
           # Unset by default, so the engine resolves to <base>/tex alongside the
           # app. Set it to serve the engine from object storage instead.
           VITE_TEX_BASE: ${{ vars.TEX_BASE }}
+          # Optional collector for sanitized reliability events. Empty disables it.
+          VITE_TELEMETRY_ENDPOINT: ${{ vars.TELEMETRY_ENDPOINT }}
           # A project page lives at /<repo>/; a user or custom-domain site at /.
           VITE_BASE: ${{ vars.PAGES_BASE || format('/{0}/', github.event.repository.name) }}
         run: npx vite build
