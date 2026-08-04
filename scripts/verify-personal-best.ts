@@ -10,7 +10,7 @@
  */
 import { chromium } from 'playwright';
 import { startServer } from './server.js';
-import { problems } from '../src/problems.js';
+import { blazeProblems } from '../src/problems.js';
 import { pointsFor } from '../src/scoring.js';
 
 const server = process.env.BEST_URL ? null : await startServer();
@@ -40,14 +40,14 @@ async function isHidden(selector: string): Promise<boolean> {
 
 /** Starts the clock, skipping the first-run warm-up when it appears. */
 async function startTimedRun(): Promise<void> {
-  await page.click('#start');
+  await page.click('#blaze-mode');
   if (await page.locator('#tutorial').isVisible()) await page.click('#tutorial-skip');
 }
 
 /** Loads a fresh round of `seconds`, then solves `count` problems. */
 async function playRound(seconds: number, count: number): Promise<void> {
   await page.goto(`${base}?seconds=${seconds}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#start:not([disabled])', { timeout: 180_000 });
+  await page.waitForSelector('#blaze-mode:not([disabled])', { timeout: 180_000 });
   await startTimedRun();
 
   for (let i = 0; i < count; i++) {
@@ -57,7 +57,7 @@ async function playRound(seconds: number, count: number): Promise<void> {
       { timeout: 60_000 },
     );
     const title = await text('#problem-title');
-    const answer = problems.find((p) => p.title === title)?.latex;
+    const answer = blazeProblems.find((p) => p.title === title)?.latex;
     if (!answer) {
       failures.push(`no answer known for "${title}"`);
       return;
@@ -103,7 +103,7 @@ try {
   // --- A worse run leaves it standing ------------------------------------
   // Solve nothing, so the run scores zero and cannot beat anything.
   await page.goto(`${base}?seconds=6`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#start:not([disabled])', { timeout: 180_000 });
+  await page.waitForSelector('#blaze-mode:not([disabled])', { timeout: 180_000 });
   await startTimedRun();
   await page.waitForSelector('#end:not([hidden])', { timeout: 60_000 });
   check('a scoreless run does not claim the record', (await text('#final-eyebrow')) === 'Time up');
@@ -117,7 +117,7 @@ try {
   // --- Beating it reports what was beaten --------------------------------
   // Two solves must outscore one, whichever problems come up: the cheapest
   // problem in the set is worth at least one point.
-  const cheapest = Math.min(...problems.map((p) => pointsFor(p.latex)));
+  const cheapest = Math.min(...blazeProblems.map((p) => pointsFor(p.latex)));
   check('two solves can outscore one', cheapest > 0);
 
   await playRound(25, 3);
@@ -145,7 +145,7 @@ try {
 
   // --- The rail shows the target during play -----------------------------
   await page.goto(`${base}?seconds=30`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#start:not([disabled])', { timeout: 180_000 });
+  await page.waitForSelector('#blaze-mode:not([disabled])', { timeout: 180_000 });
   await startTimedRun();
   check('the rail shows the record to beat', !(await isHidden('#rail-best')));
   check('the rail figure is the record', (await text('#rail-best')) === String(third));

@@ -34,6 +34,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   padding: calc(var(--step) * 4) var(--step);
@@ -177,6 +181,13 @@ body {
   margin: 0;
 }
 
+.section-title {
+  font-size: clamp(2rem, 7vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  margin: var(--step) 0;
+}
+
 /* ------------------------------------------------------------------- intro */
 
 .brief dl {
@@ -209,6 +220,70 @@ code {
   background: rgb(255 255 255 / 0.55);
   padding: 0.1em 0.35em;
   color: var(--ink);
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--step) * 2);
+  margin-bottom: calc(var(--step) * 3);
+}
+
+.mode-card {
+  min-height: 10rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: calc(var(--step) * 2.5);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.2);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.mode-card-blaze {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.mode-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.mode-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mode-name {
+  font-family: var(--machine);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.mode-description {
+  margin-top: var(--step);
+  color: currentColor;
+  opacity: 0.72;
+}
+
+.mode-action {
+  margin-top: auto;
+  padding-top: calc(var(--step) * 2);
+  font-family: var(--machine);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.engine-launch {
+  border-top: 1px solid var(--rule);
+  padding-top: calc(var(--step) * 1.5);
 }
 
 .launch {
@@ -305,6 +380,68 @@ code {
   margin: 0;
 }
 
+/* ------------------------------------------------------------------ topics */
+
+.topic-masthead {
+  margin-bottom: calc(var(--step) * 2);
+}
+
+.topic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+  margin-bottom: calc(var(--step) * 3);
+}
+
+.topic-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 1rem;
+  min-height: 7rem;
+  text-align: left;
+  padding: calc(var(--step) * 2);
+  border: 0;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: rgb(255 255 255 / 0.15);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.topic-card:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.topic-card-title {
+  font-family: var(--machine);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.topic-card-progress {
+  font-family: var(--machine);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: currentColor;
+  opacity: 0.68;
+}
+
+.topic-card-description {
+  grid-column: 1 / -1;
+  align-self: end;
+  color: currentColor;
+  opacity: 0.72;
+  font-size: 0.875rem;
+}
+
+.screen-actions {
+  display: flex;
+  gap: var(--step);
+}
+
 /* --------------------------------------------------------------- tutorial */
 
 .tutorial-heading {
@@ -358,6 +495,25 @@ code {
 .button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.button-quiet {
+  border-color: var(--rule);
+}
+
+.text-button {
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  padding: 0 0 0.1rem;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--machine);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  color: var(--ink);
 }
 
 :focus-visible {
@@ -416,6 +572,27 @@ code {
   align-items: flex-end;
 }
 
+.practice-rail {
+  align-items: center;
+}
+
+.practice-progress {
+  flex: 1;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.practice-progress strong {
+  font-family: var(--machine);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-progress-fill {
+  transition-duration: 0.25s;
+}
+
 .score-value {
   font-family: var(--machine);
   font-size: 2rem;
@@ -451,6 +628,36 @@ code {
 .problem-description {
   color: var(--ink-soft);
   margin: 0.25rem 0 0;
+}
+
+.practice-tools {
+  border-top: 1px solid var(--rule);
+  margin-top: calc(var(--step) * 1.5);
+  padding-top: var(--step);
+}
+
+.practice-tool-actions {
+  display: flex;
+  gap: calc(var(--step) * 2);
+}
+
+.practice-hint-text {
+  color: var(--ink-soft);
+  margin: var(--step) 0 0;
+}
+
+.practice-solution {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: var(--step) 0 0;
+  padding: var(--step);
+  border-left: 2px solid var(--ink);
+  background: rgb(255 255 255 / 0.45);
+}
+
+.practice-solution code {
+  padding: 0;
+  background: transparent;
 }
 
 /* ------------------------------------------------------------------- proof */
@@ -651,6 +858,13 @@ code {
   color: var(--ink-faint);
 }
 
+.practice-final-title {
+  font-size: clamp(2.5rem, 9vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  margin: var(--step) 0;
+}
+
 .ledger {
   display: grid;
   gap: calc(var(--step) * 3);
@@ -711,6 +925,11 @@ code {
 }
 
 @media (max-width: 30rem) {
+  .mode-grid,
+  .topic-grid {
+    grid-template-columns: 1fr;
+  }
+
   .brief dl {
     grid-template-columns: 1fr;
     gap: var(--step);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hash } from './blake3-shim.js';
-import { problems } from '../problems.js';
+import { blazeProblems } from '../problems.js';
+import { practiceProblems } from '../practiceProblems.js';
 import { buildDocument } from './document.js';
 
 const hex = (input: string, length?: number) =>
@@ -45,7 +46,7 @@ describe('blake3 shim', () => {
     // corpus is worth checking directly.
     const digests = new Set<string>();
     let count = 0;
-    for (const problem of problems) {
+    for (const problem of [...blazeProblems, ...practiceProblems]) {
       for (const body of [problem.latex, `${problem.latex} `, problem.latex.slice(0, -1)]) {
         digests.add(hex(buildDocument(body, problem.preamble)));
         count++;

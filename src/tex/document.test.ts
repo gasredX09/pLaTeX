@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildDocument, PREAMBLE, BUNDLED_PACKAGES, PRELOAD_BUNDLES } from './document.js';
-import { problems } from '../problems.js';
+import { blazeProblems } from '../problems.js';
+import { practiceProblems } from '../practiceProblems.js';
 
 /** Package names loaded by a preamble fragment. */
 function packagesIn(preamble: string): string[] {
@@ -70,6 +71,7 @@ describe('the shared preamble', () => {
 });
 
 describe('problem preambles', () => {
+  const problems = [...blazeProblems, ...practiceProblems];
   it('declares tikz on exactly the problems that draw with it', () => {
     for (const problem of problems) {
       const usesTikz = problem.latex.includes('tikzpicture');

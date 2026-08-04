@@ -11,6 +11,7 @@
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 import { TUTORIAL } from '../src/onboarding.js';
+import { practiceProblems, practiceTopics } from '../src/practiceProblems.js';
 
 const server = await preview({
   configFile: new URL('../vite.config.ts', import.meta.url).pathname,
@@ -42,10 +43,10 @@ try {
   check('page is cross-origin isolated', await page.evaluate(() => crossOriginIsolated));
 
   const warmStart = Date.now();
-  await page.waitForSelector('#start:not([disabled])', { timeout: 180_000 });
+  await page.waitForSelector('#blaze-mode:not([disabled])', { timeout: 180_000 });
   check('engine warms from a cold cache', true, `${Date.now() - warmStart}ms`);
 
-  await page.click('#start');
+  await page.click('#blaze-mode');
   if (await page.locator('#tutorial').isVisible()) {
     await page.waitForFunction(
       () => (document.getElementById('tutorial-target-canvas') as HTMLCanvasElement).width > 0,
@@ -72,8 +73,8 @@ try {
 
   // Type the answer for whichever problem came up, then require a match.
   const title = await page.textContent('#problem-title');
-  const { problems } = await import('../src/problems.js');
-  const answer = problems.find((p) => p.title === title)?.latex;
+  const { blazeProblems } = await import('../src/problems.js');
+  const answer = blazeProblems.find((p) => p.title === title)?.latex;
   check('problem is one from the set', !!answer, title ?? '(none)');
 
   if (answer) {
@@ -86,6 +87,63 @@ try {
     const score = await page.textContent('#score');
     check('correct answer scores', Number(score) > 0, `${score} points`);
   }
+
+  const practicePage = await context.newPage();
+  practicePage.on('pageerror', (err) => failures.push(`practice page error: ${err.message}`));
+  await practicePage.goto(url, { waitUntil: 'domcontentloaded' });
+  await practicePage.waitForSelector('#practice-mode:not([disabled])', { timeout: 180_000 });
+  await practicePage.click('#practice-mode');
+  check('Practice Mode opens topic selection', await practicePage.locator('#topics').isVisible());
+  check(
+    'all practice topics are offered',
+    (await practicePage.locator('.topic-card').count()) === practiceTopics.length,
+  );
+
+  await practicePage.click('[data-topic="math"]');
+  await practicePage.waitForFunction(
+    () => (document.getElementById('target-canvas') as HTMLCanvasElement).width > 0,
+    null,
+    { timeout: 60_000 },
+  );
+  check('Practice Mode hides the Blaze clock', await practicePage.locator('#blaze-rail').isHidden());
+  check('Practice Mode shows topic progress', await practicePage.locator('#practice-rail').isVisible());
+
+  await practicePage.click('#practice-hint');
+  check('practice hint can be shown', await practicePage.locator('#practice-hint-text').isVisible());
+  await practicePage.click('#practice-reveal');
+  check('practice source can be revealed', await practicePage.locator('#practice-solution').isVisible());
+
+  const practiceTitle = await practicePage.textContent('#problem-title');
+  const practiceAnswer = practiceProblems.find((problem) => problem.title === practiceTitle)?.latex;
+  check('practice target comes from its separate catalog', !!practiceAnswer, practiceTitle ?? '(none)');
+  if (practiceAnswer) {
+    await practicePage.fill('#input', practiceAnswer);
+    await practicePage.waitForFunction(
+      () => document.getElementById('status')?.className.includes('match') ?? false,
+      null,
+      { timeout: 60_000 },
+    );
+    await practicePage.waitForFunction(
+      () => document.getElementById('practice-progress-text')?.textContent?.startsWith('1 of 3'),
+      null,
+      { timeout: 10_000 },
+    );
+    check('practice completion updates without a score', true);
+  }
+
+  await practicePage.click('#practice-exit');
+  check(
+    'practice progress appears on topic selection',
+    (await practicePage.locator('[data-topic="math"] .topic-card-progress').textContent()) === '1/3',
+  );
+
+  await practicePage.reload({ waitUntil: 'domcontentloaded' });
+  await practicePage.waitForSelector('#practice-mode:not([disabled])', { timeout: 180_000 });
+  await practicePage.click('#practice-mode');
+  check(
+    'practice progress survives a reload',
+    (await practicePage.locator('[data-topic="math"] .topic-card-progress').textContent()) === '1/3',
+  );
 } catch (err) {
   failures.push(err instanceof Error ? err.message : String(err));
 }

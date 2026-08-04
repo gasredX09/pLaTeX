@@ -1,5 +1,5 @@
 /**
- * The problem set.
+ * The Blaze Mode problem set.
  *
  * Each `latex` is a document *body*, compiled inside the template in
  * tex/document.ts. Authoring rules:
@@ -34,7 +34,7 @@ export interface Problem {
   preamble?: string;
 }
 
-export const problems: Problem[] = [
+export const blazeProblems: Problem[] = [
   // ---------------------------------------------------------------- math ---
   {
     id: 'quadratic',

@@ -34,12 +34,17 @@ async function currentAnswer(page: Page): Promise<string> {
   return page.evaluate(async () => {
     // Resolved by the dev server at runtime; the indirection keeps TypeScript
     // from trying to resolve a browser URL as a module path.
-    const specifier = '/src/problems.ts';
-    const mod = (await import(/* @vite-ignore */ specifier)) as {
-      problems: { title: string; latex: string }[];
+    const blazeSpecifier = '/src/problems.ts';
+    const practiceSpecifier = '/src/practiceProblems.ts';
+    const blaze = (await import(/* @vite-ignore */ blazeSpecifier)) as {
+      blazeProblems: { title: string; latex: string }[];
+    };
+    const practice = (await import(/* @vite-ignore */ practiceSpecifier)) as {
+      practiceProblems: { title: string; latex: string }[];
     };
     const title = document.getElementById('problem-title')?.textContent ?? '';
-    return mod.problems.find((p) => p.title === title)?.latex ?? '';
+    return [...blaze.blazeProblems, ...practice.practiceProblems]
+      .find((p) => p.title === title)?.latex ?? '';
   });
 }
 
@@ -47,10 +52,13 @@ async function currentAnswer(page: Page): Promise<string> {
 await page.goto(`${BASE}?seconds=20`, { waitUntil: 'domcontentloaded' });
 
 await page.screenshot({ path: `${OUT}/1-intro-loading.png` });
-await page.waitForSelector('#start:not([disabled])', { timeout: 120_000 });
+await page.waitForSelector('#blaze-mode:not([disabled])', { timeout: 120_000 });
 await page.screenshot({ path: `${OUT}/2-intro-ready.png` });
+await page.setViewportSize({ width: 430, height: 950 });
+await page.screenshot({ path: `${OUT}/2b-intro-narrow.png`, fullPage: true });
+await page.setViewportSize({ width, height });
 
-await page.click('#start');
+await page.click('#blaze-mode');
 await page.waitForFunction(
   () => (document.getElementById('tutorial-target-canvas') as HTMLCanvasElement).width > 0,
   null,
@@ -110,6 +118,53 @@ await page.waitForSelector('#end:not([hidden])', { timeout: 40_000 });
 // Let the screen's entrance animation finish, or the shot catches it mid-fade.
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${OUT}/12-end.png` });
+
+await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('#practice-mode:not([disabled])', { timeout: 120_000 });
+await page.click('#practice-mode');
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${OUT}/13-practice-topics.png` });
+await page.setViewportSize({ width: 430, height: 950 });
+await page.screenshot({ path: `${OUT}/13b-practice-topics-narrow.png`, fullPage: true });
+await page.setViewportSize({ width, height });
+
+await page.click('[data-topic="math"]');
+await page.waitForFunction(
+  () => (document.getElementById('target-canvas') as HTMLCanvasElement).width > 0,
+  null,
+  { timeout: 60_000 },
+);
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${OUT}/14-practice-fresh.png` });
+
+await page.click('#practice-hint');
+await page.screenshot({ path: `${OUT}/15-practice-hint.png` });
+await page.click('#practice-reveal');
+await page.screenshot({ path: `${OUT}/16-practice-source.png` });
+
+await page.fill('#input', await currentAnswer(page));
+await waitForStatus(page, 'match');
+await page.screenshot({ path: `${OUT}/17-practice-match.png` });
+
+await page.setViewportSize({ width: 430, height: 950 });
+await page.screenshot({ path: `${OUT}/18-practice-narrow.png` });
+await page.setViewportSize({ width, height });
+
+for (let remaining = 2; remaining > 0; remaining--) {
+  await page.waitForFunction(
+    () => {
+      const input = document.getElementById('input') as HTMLTextAreaElement;
+      return !input.disabled && !document.getElementById('status')?.className.includes('match');
+    },
+    null,
+    { timeout: 60_000 },
+  );
+  await page.fill('#input', await currentAnswer(page));
+  await waitForStatus(page, 'match');
+}
+await page.waitForSelector('#practice-end:not([hidden])', { timeout: 60_000 });
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${OUT}/19-practice-end.png` });
 
 await browser.close();
 await server?.close();

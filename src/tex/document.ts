@@ -78,9 +78,9 @@ export const BUNDLED_PACKAGES = [
 ] as const;
 
 /**
- * Bundles worth fetching in the background once the engine is up: needed by some
- * problems, too big to make everyone wait for before the first compile.
- * pgf-tikz is 30.6MB and four problems use it.
+ * Bundles worth fetching after a mode that needs them is selected. They are too
+ * large to make every Practice Mode topic pay for them before the first compile.
+ * pgf-tikz is 30.6MB and seven problems across both catalogs use it.
  */
 export const PRELOAD_BUNDLES = ['pgf-tikz'];
 

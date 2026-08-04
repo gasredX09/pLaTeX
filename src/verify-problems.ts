@@ -7,7 +7,8 @@
  */
 import { TexEngine } from './tex/engine.js';
 import { rasterizeFirstPage } from './render/rasterize.js';
-import { problems } from './problems.js';
+import { blazeProblems } from './problems.js';
+import { practiceProblems } from './practiceProblems.js';
 import { normalize } from './normalize.js';
 import { BUNDLED_PACKAGES } from './tex/document.js';
 
@@ -67,6 +68,7 @@ function inspectInk(image: ImageData): Ink {
 async function main(): Promise<void> {
   const engine = new TexEngine();
   await engine.warm();
+  const problems = [...blazeProblems, ...practiceProblems];
   log(`Verifying ${problems.length} problems\n`);
 
   let failed = 0;

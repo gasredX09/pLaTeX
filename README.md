@@ -1,15 +1,17 @@
 # pLaTeX
 
-A LaTeX speed-typesetting game, in the spirit of [TeXnique](https://texnique.xyz/)
-but for **full LaTeX** rather than only maths. You get a printed page; reproduce
-it in LaTeX before the clock runs out.
+A full-LaTeX typesetting game with two separate experiences. Practice Mode is
+an untimed, topic-by-topic curriculum. Blaze Mode is a three-minute challenge in
+the spirit of [TeXnique](https://texnique.xyz/). In both modes, you get a printed
+page and reproduce it in LaTeX.
 
 The wordmark is set with LaTeX's own logo kerning, with gentler pulls than the
 canonical ratios because the interface is monospaced. See `.logotype` in
 `src/styles.css`.
 
-Problems cover maths, text formatting, accents and symbols, lists, tables, boxes
-and spacing, TikZ, and document structure.
+Practice Mode has 24 ordered exercises across maths, text formatting, accents
+and symbols, lists, tables, boxes and spacing, TikZ, and document structure.
+Blaze Mode uses a completely separate catalog of 45 shuffled problems.
 
 ## How it decides you are right
 
@@ -24,17 +26,18 @@ spellings that differ only in spacing, such as `\not\in` and `\notin`; unlike
 TeXnique those are applied to the target as well as to your input, so a target
 can be authored in either spelling without becoming unsolvable.
 
-Scoring follows TeXnique: `ceil(source length / 10)` points per problem, three
-minutes per run, skipping costs only time.
+Blaze Mode scoring follows TeXnique: `ceil(source length / 10)` points per
+problem, three minutes per run, and skipping costs only time. Practice Mode has
+no timer or score. It saves completion per exercise, offers a hint and source
+reveal, and returns skipped exercises once at the end of a topic.
 
 The first run begins with a no-clock warm-up that shows the source to type and
 teaches the compile, preview, and registration loop. Completion is stored in the
-browser so returning players go straight to the clock.
+browser so returning players go straight to their selected mode.
 
-Your best run is kept in the browser's local storage, shown on the intro, beside
-the running score so you can see what you are chasing, and on the end sheet.
-There is no server, so the record is per browser and per device. A scoreless run
-is never recorded, and a tie does not count as beating it.
+Your Blaze best and Practice completion are kept separately in the browser's
+local storage. There is no server, so both are per browser and per device. A
+scoreless Blaze run is never recorded, and a tie does not count as beating it.
 
 ## Setup
 
@@ -56,11 +59,11 @@ npm run verify           # everything below, in order
 
 | Command | What it covers |
 | --- | --- |
-| `npm test` | Pure logic: scoring, normalization, pixel comparison, run state, hash shim |
+| `npm test` | Pure logic: both session types, catalog separation, practice progress, scoring, normalization, pixel comparison, and hash shim |
 | `npm run smoke` | Engine init, cross-origin isolation, render determinism, equivalent-markup matching, near-miss rejection, recovery from a runaway macro |
 | `npm run verify:problems` | Every problem compiles, renders non-blank, fits one page, stays inside the margins, and loads only bundled packages |
 | `npm run verify:best` | The personal best across several runs: first record, missed record, beaten record, and survival of a reload |
-| `npm run verify:build` | The production bundle actually plays, from a cold cache |
+| `npm run verify:build` | Both modes actually play through the production bundle, including persisted practice progress |
 | `npm run shots` | Screenshots of every screen and state, for design review |
 
 The browser-driven checks start their own dev server, so no separate `npm run dev`
@@ -91,7 +94,7 @@ Cross-Origin-Embedder-Policy: require-corp
 ```
 
 Its own documentation lists this as a requirement, but it is not one: the code
-falls back to a plain `ArrayBuffer`. Measured without the headers, all 45
+falls back to a plain `ArrayBuffer`. Measured without the headers, all 69
 problems still compile and the median compile goes from 101ms to 115ms. Set them
 if you can, but their absence is a performance note, not a blocker.
 
@@ -109,10 +112,10 @@ deployed at all.
 
 The shared preamble is a bandwidth decision as much as a typesetting one, because
 the engine fetches a whole bundle per `\usepackage` on a player's first compile.
-`tikz` alone pulls 30.6MB, so it sits on the four problems that draw with it and
-is warmed in the background after startup; `tabularx` pulled 15.8MB for nothing
-and is gone. That took a first visit from ~96MB to ~50MB. `src/tex/document.test.ts`
-guards against the packages creeping back.
+`tikz` alone pulls 30.6MB, so it sits only on the seven problems that draw with
+it. The bundle is warmed when Blaze Mode or the TikZ practice topic is selected;
+other practice topics do not request it. `tabularx` pulled 15.8MB for nothing and
+is gone. `src/tex/document.test.ts` guards against the packages creeping back.
 
 ### Deploying
 
@@ -167,7 +170,9 @@ the deployment's privacy posture.
 
 ## Adding problems
 
-Add an entry to `src/problems.ts`, then run `npm run verify:problems`.
+Add Blaze problems to `src/problems.ts` and Practice exercises to
+`src/practiceProblems.ts`, then run `npm run verify:problems`. The catalogs must
+have distinct IDs and target source; unit tests enforce both rules.
 
 The `latex` field is a document *body*; the class and preamble come from
 `src/tex/document.ts`. Constraints the verifier enforces:
@@ -183,9 +188,12 @@ The `latex` field is a document *body*; the class and preamble come from
 
 ```
 src/
-  main.ts              screen transitions, the clock, keystroke to verdict
-  game.ts              run state: timer, score, deck, skip           [tested]
-  problems.ts          the problem set
+  main.ts              mode selection, screens, keystroke to verdict
+  game.ts              Blaze timer, score, deck, skip                [tested]
+  problems.ts          the separate Blaze problem catalog            [tested]
+  practiceProblems.ts  topics and ordered Practice catalog           [tested]
+  practiceSession.ts   finite pass and skipped-item review            [tested]
+  practiceProgress.ts  stored completion by problem ID                [tested]
   scoring.ts           ceil(len/10)                                  [tested]
   normalize.ts         equivalent-spelling rules                     [tested]
   personalBest.ts      the stored record                             [tested]

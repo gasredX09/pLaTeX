@@ -22,7 +22,7 @@
           <span class="wordmark-rule"></span>
         </h1>
         <p class="standfirst">
-          You get a printed page. Reproduce it in LaTeX before the clock runs out.
+          Learn by topic at your own pace, then test yourself against the clock.
         </p>
       </header>
 
@@ -42,23 +42,33 @@
             loaded.
           </dd>
 
-          <dt>Scoring</dt>
+          <dt>Two ways to play</dt>
           <dd>
-            One point per ten characters of the target's source. Three minutes on
-            the clock. Skipping costs nothing but time.
+            Practice Mode is untimed and saves your progress. Blaze Mode gives you
+            three minutes with a separate mixed problem set.
           </dd>
         </dl>
       </div>
 
       <p class="record" id="intro-best" hidden>
-        <span class="label">Your best</span>
+        <span class="label">Blaze best</span>
         <span class="record-value" id="intro-best-value"></span>
       </p>
 
-      <div class="launch">
-        <button class="button button-primary" id="start" disabled>
-          Warming the type
+      <div class="mode-grid" aria-label="Choose a mode">
+        <button class="mode-card" id="practice-mode" disabled>
+          <span class="mode-name">Practice Mode</span>
+          <span class="mode-description">Learn topic by topic. No clock, no score.</span>
+          <span class="mode-action">Choose a topic</span>
         </button>
+        <button class="mode-card mode-card-blaze" id="blaze-mode" disabled>
+          <span class="mode-name">Blaze Mode</span>
+          <span class="mode-description">Three minutes. Mixed problems. Set a record.</span>
+          <span class="mode-action">Start the challenge</span>
+        </button>
+      </div>
+
+      <div class="engine-launch">
         <div class="engine-load">
           <progress
             class="engine-progress"
@@ -72,6 +82,33 @@
             First visit: about 48 MB. Later visits reuse browser storage.
           </p>
         </div>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ topics -->
+    <section class="screen" id="topics" hidden>
+      <p class="screen-mark">
+        <span class="logotype logotype-small"
+          >p<span class="logotype-l">L</span><span class="logotype-a">a</span>T<span
+            class="logotype-e"
+            >e</span
+          >X</span
+        >
+      </p>
+
+      <header class="masthead topic-masthead">
+        <p class="eyebrow">Practice Mode</p>
+        <h1 class="section-title">Choose a topic</h1>
+        <p class="standfirst">
+          Each set is untimed. Finish exercises in order, or leave one for later
+          and return to it at the end.
+        </p>
+      </header>
+
+      <div class="topic-grid" id="topic-list"></div>
+
+      <div class="screen-actions">
+        <button class="button" id="topics-home">Back to mode selection</button>
       </div>
     </section>
 
@@ -146,7 +183,9 @@
         <button class="button button-primary" id="tutorial-continue" disabled>
           Match the target to continue
         </button>
-        <p class="engine-status">The timer starts only after this step.</p>
+        <p class="engine-status" id="tutorial-note">
+          This warm-up does not count toward either mode.
+        </p>
       </div>
     </section>
 
@@ -161,7 +200,7 @@
         >
       </p>
 
-      <div class="rail">
+      <div class="rail" id="blaze-rail">
         <div class="rail-clock">
           <span class="clock" id="clock">3:00</span>
           <div class="clock-track"><div class="clock-fill" id="clock-fill"></div></div>
@@ -174,13 +213,32 @@
         </div>
       </div>
 
+      <div class="rail practice-rail" id="practice-rail" hidden>
+        <div class="practice-progress">
+          <span class="label" id="practice-topic-label">Practice Mode</span>
+          <strong id="practice-progress-text">0 of 3 complete</strong>
+          <div class="clock-track" aria-hidden="true">
+            <div class="clock-fill practice-progress-fill" id="practice-progress-fill"></div>
+          </div>
+        </div>
+        <button class="button button-quiet" id="practice-exit">Choose topic</button>
+      </div>
+
       <header class="problem">
         <p class="problem-meta">
           <span class="problem-number" id="problem-number">Problem 1</span>
           <span class="problem-points" id="problem-points">(4 points)</span>
         </p>
-        <h2 class="problem-title" id="problem-title">—</h2>
+        <h2 class="problem-title" id="problem-title">...</h2>
         <p class="problem-description" id="problem-description"></p>
+        <div class="practice-tools" id="practice-tools" hidden>
+          <div class="practice-tool-actions">
+            <button class="text-button" id="practice-hint">Show hint</button>
+            <button class="text-button" id="practice-reveal">Reveal source</button>
+          </div>
+          <p class="practice-hint-text" id="practice-hint-text" hidden></p>
+          <pre class="practice-solution" id="practice-solution" hidden><code id="practice-solution-code"></code></pre>
+        </div>
       </header>
 
       <div class="proof" id="proof">
@@ -264,6 +322,42 @@
 
       <div class="launch">
         <button class="button button-primary" id="again">Run it again</button>
+        <button class="button" id="end-home">Choose a mode</button>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------- practice end -->
+    <section class="screen" id="practice-end" hidden>
+      <p class="screen-mark">
+        <span class="logotype logotype-small"
+          >p<span class="logotype-l">L</span><span class="logotype-a">a</span>T<span
+            class="logotype-e"
+            >e</span
+          >X</span
+        >
+      </p>
+
+      <header class="masthead">
+        <p class="eyebrow">Practice Mode</p>
+        <h1 class="practice-final-title" id="practice-final-title">Topic complete</h1>
+        <p class="standfirst" id="practice-final-summary"></p>
+      </header>
+
+      <div class="ledger">
+        <div class="ledger-column">
+          <h3 class="label">Completed this visit</h3>
+          <ul id="practice-completed-list" class="ledger-list"></ul>
+        </div>
+        <div class="ledger-column">
+          <h3 class="label">Left for later</h3>
+          <ul id="practice-later-list" class="ledger-list"></ul>
+        </div>
+      </div>
+
+      <div class="launch">
+        <button class="button button-primary" id="practice-again">Practice this topic again</button>
+        <button class="button" id="practice-another">Choose another topic</button>
+        <button class="button" id="practice-home">Choose a mode</button>
       </div>
     </section>
 

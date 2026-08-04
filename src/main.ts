@@ -4,7 +4,20 @@
  */
 import './styles.css';
 import { Game, formatClock } from './game.js';
-import { problems } from './problems.js';
+import { blazeProblems, type Problem } from './problems.js';
+import {
+  practiceProblems,
+  practiceTopics,
+  problemsForTopic,
+  type PracticeProblem,
+  type PracticeTopic,
+} from './practiceProblems.js';
+import { PracticeSession } from './practiceSession.js';
+import {
+  completePracticeProblem,
+  progressForTopic,
+  readPracticeProgress,
+} from './practiceProgress.js';
 import { formatPoints } from './scoring.js';
 import { TexEngine } from './tex/engine.js';
 import { PRELOAD_BUNDLES } from './tex/document.js';
@@ -43,14 +56,20 @@ function need<T extends Element>(id: string): T {
 
 const ui = {
   intro: need<HTMLElement>('intro'),
+  topics: need<HTMLElement>('topics'),
   tutorial: need<HTMLElement>('tutorial'),
   play: need<HTMLElement>('play'),
   end: need<HTMLElement>('end'),
+  practiceEnd: need<HTMLElement>('practice-end'),
 
-  start: need<HTMLButtonElement>('start'),
+  practiceMode: need<HTMLButtonElement>('practice-mode'),
+  blazeMode: need<HTMLButtonElement>('blaze-mode'),
   engineStatus: need<HTMLParagraphElement>('engine-status'),
   engineNote: need<HTMLParagraphElement>('engine-note'),
   engineProgress: need<HTMLProgressElement>('engine-progress'),
+
+  topicList: need<HTMLElement>('topic-list'),
+  topicsHome: need<HTMLButtonElement>('topics-home'),
 
   tutorialTitle: need<HTMLElement>('tutorial-title'),
   tutorialDescription: need<HTMLElement>('tutorial-description'),
@@ -63,6 +82,14 @@ const ui = {
   tutorialStatusText: need<HTMLElement>('tutorial-status-text'),
   tutorialSkip: need<HTMLButtonElement>('tutorial-skip'),
   tutorialContinue: need<HTMLButtonElement>('tutorial-continue'),
+  tutorialNote: need<HTMLElement>('tutorial-note'),
+
+  blazeRail: need<HTMLElement>('blaze-rail'),
+  practiceRail: need<HTMLElement>('practice-rail'),
+  practiceTopicLabel: need<HTMLElement>('practice-topic-label'),
+  practiceProgressText: need<HTMLElement>('practice-progress-text'),
+  practiceProgressFill: need<HTMLElement>('practice-progress-fill'),
+  practiceExit: need<HTMLButtonElement>('practice-exit'),
 
   clock: need<HTMLElement>('clock'),
   clockFill: need<HTMLElement>('clock-fill'),
@@ -72,6 +99,13 @@ const ui = {
   problemPoints: need<HTMLElement>('problem-points'),
   problemTitle: need<HTMLElement>('problem-title'),
   problemDescription: need<HTMLElement>('problem-description'),
+
+  practiceTools: need<HTMLElement>('practice-tools'),
+  practiceHint: need<HTMLButtonElement>('practice-hint'),
+  practiceReveal: need<HTMLButtonElement>('practice-reveal'),
+  practiceHintText: need<HTMLElement>('practice-hint-text'),
+  practiceSolution: need<HTMLElement>('practice-solution'),
+  practiceSolutionCode: need<HTMLElement>('practice-solution-code'),
 
   targetCanvas: need<HTMLCanvasElement>('target-canvas'),
   attemptCanvas: need<HTMLCanvasElement>('attempt-canvas'),
@@ -88,6 +122,15 @@ const ui = {
   solvedList: need<HTMLUListElement>('solved-list'),
   skippedList: need<HTMLUListElement>('skipped-list'),
   again: need<HTMLButtonElement>('again'),
+  endHome: need<HTMLButtonElement>('end-home'),
+
+  practiceFinalTitle: need<HTMLElement>('practice-final-title'),
+  practiceFinalSummary: need<HTMLElement>('practice-final-summary'),
+  practiceCompletedList: need<HTMLUListElement>('practice-completed-list'),
+  practiceLaterList: need<HTMLUListElement>('practice-later-list'),
+  practiceAgain: need<HTMLButtonElement>('practice-again'),
+  practiceAnother: need<HTMLButtonElement>('practice-another'),
+  practiceHome: need<HTMLButtonElement>('practice-home'),
 
   introBest: need<HTMLElement>('intro-best'),
   introBestValue: need<HTMLElement>('intro-best-value'),
@@ -101,8 +144,17 @@ const storage = browserStorage();
 /** Cached so the rail can show it without touching storage every second. */
 let best: BestRun | null = readBest(storage);
 let tutorialComplete = hasCompletedTutorial(storage);
+let practiceProgress = readPracticeProgress(storage);
 
-const game = new Game(problems);
+const game = new Game(blazeProblems);
+let practiceSession: PracticeSession | null = null;
+let selectedTopic: PracticeTopic | null = null;
+
+type ActiveMode = 'blaze' | 'practice';
+type PendingStart = { mode: 'blaze' } | { mode: 'practice'; topic: PracticeTopic };
+
+let activeMode: ActiveMode | null = null;
+let pendingStart: PendingStart | null = null;
 
 // A short round is handy when checking the end screen. Dev only, so the shipped
 // game always runs the full three minutes.
@@ -130,8 +182,8 @@ const warmClock = setInterval(() => {
 engine.onStageChange = (stage, detail, percent) => {
   if (stage === 'ready') {
     clearInterval(warmClock);
-    ui.start.disabled = false;
-    ui.start.textContent = tutorialComplete ? 'Start the clock' : 'Try a warm-up';
+    ui.practiceMode.disabled = false;
+    ui.blazeMode.disabled = false;
     ui.engineProgress.value = 100;
     const seconds = (performance.now() - warmStartedAt) / 1_000;
     const duration = seconds < 1 ? 'under a second' : `${seconds.toFixed(1)}s`;
@@ -140,7 +192,8 @@ engine.onStageChange = (stage, detail, percent) => {
       'This browser will reuse the engine files when storage is available.';
   } else if (stage === 'failed') {
     clearInterval(warmClock);
-    ui.start.textContent = 'Engine unavailable';
+    ui.practiceMode.disabled = true;
+    ui.blazeMode.disabled = true;
     ui.engineStatus.textContent = `Could not load the TeX engine: ${detail ?? 'unknown error'}. Reload to try again.`;
     ui.engineNote.textContent = 'Check the connection and browser storage, then reload.';
     telemetry.report({ event: 'engine_warm_failed', reason: classifyError(detail) });
@@ -165,19 +218,20 @@ void engine.warm().catch(() => {
   /* Surfaced through onStageChange. */
 });
 
-// Then keep fetching the bundles only some problems need, so drawing one of
-// those does not stall the clock. Start is not gated on this.
-engine.preload(PRELOAD_BUNDLES);
-
 renderBest();
+renderTopics();
 
 // --------------------------------------------------------------- transitions
 
-function show(screen: 'intro' | 'tutorial' | 'play' | 'end'): void {
+type Screen = 'intro' | 'topics' | 'tutorial' | 'play' | 'end' | 'practice-end';
+
+function show(screen: Screen): void {
   ui.intro.hidden = screen !== 'intro';
+  ui.topics.hidden = screen !== 'topics';
   ui.tutorial.hidden = screen !== 'tutorial';
   ui.play.hidden = screen !== 'play';
   ui.end.hidden = screen !== 'end';
+  ui.practiceEnd.hidden = screen !== 'practice-end';
 }
 
 /** Shows the standing record wherever it appears, or hides it if there is none. */
@@ -189,12 +243,82 @@ function renderBest(): void {
   ui.railBest.textContent = String(best.score);
 }
 
-function beginFromIntro(): void {
-  if (tutorialComplete) startRun();
+function renderTopics(): void {
+  ui.topicList.replaceChildren();
+  for (const topic of practiceTopics) {
+    const progress = progressForTopic(topic.id, practiceProgress, practiceProblems);
+    const button = document.createElement('button');
+    button.className = 'topic-card';
+    button.type = 'button';
+    button.dataset.topic = topic.id;
+    button.setAttribute(
+      'aria-label',
+      `${topic.title}, ${progress.completed} of ${progress.total} complete`,
+    );
+
+    const title = document.createElement('span');
+    title.className = 'topic-card-title';
+    title.textContent = topic.title;
+
+    const count = document.createElement('span');
+    count.className = 'topic-card-progress';
+    count.textContent = `${progress.completed}/${progress.total}`;
+
+    const description = document.createElement('span');
+    description.className = 'topic-card-description';
+    description.textContent = topic.description;
+
+    button.append(title, count, description);
+    button.addEventListener('click', () => choosePracticeTopic(topic));
+    ui.topicList.append(button);
+  }
+}
+
+function openTopics(): void {
+  clearInterval(clockTimer);
+  checker.cancel();
+  pendingStart = null;
+  activeMode = null;
+  practiceSession = null;
+  renderTopics();
+  show('topics');
+  ui.topicList.querySelector<HTMLButtonElement>('button')?.focus();
+}
+
+function returnHome(): void {
+  clearInterval(clockTimer);
+  checker.cancel();
+  tutorialChecker.cancel();
+  pendingStart = null;
+  activeMode = null;
+  selectedTopic = null;
+  practiceSession = null;
+  renderBest();
+  renderTopics();
+  show('intro');
+  ui.practiceMode.focus();
+}
+
+function chooseBlaze(): void {
+  pendingStart = { mode: 'blaze' };
+  engine.preload(PRELOAD_BUNDLES);
+  if (tutorialComplete) continuePendingStart();
+  else void startTutorial();
+}
+
+function choosePracticeTopic(topic: PracticeTopic): void {
+  pendingStart = { mode: 'practice', topic };
+  if (topic.id === 'tikz') engine.preload(PRELOAD_BUNDLES);
+  if (tutorialComplete) continuePendingStart();
   else void startTutorial();
 }
 
 async function startTutorial(): Promise<void> {
+  const destination = pendingStart;
+  if (!destination) {
+    returnHome();
+    return;
+  }
   show('tutorial');
   ui.tutorialTitle.textContent = TUTORIAL.title;
   ui.tutorialDescription.textContent = TUTORIAL.description;
@@ -203,6 +327,10 @@ async function startTutorial(): Promise<void> {
   ui.tutorialInput.disabled = true;
   ui.tutorialContinue.disabled = true;
   ui.tutorialContinue.textContent = 'Match the target to continue';
+  ui.tutorialNote.textContent =
+    destination.mode === 'practice'
+      ? 'Practice Mode has no timer.'
+      : 'The Blaze Mode clock starts after this warm-up.';
   clearCanvas(ui.tutorialTargetCanvas);
   clearCanvas(ui.tutorialAttemptCanvas);
   setTutorialStatus('compiling', 'Preparing the warm-up target');
@@ -211,9 +339,11 @@ async function startTutorial(): Promise<void> {
   if (ui.tutorial.hidden) return;
   if (!target) {
     telemetry.report({ event: 'target_compile_failed', problem: 'tutorial' });
-    setTutorialStatus('invalid', 'Warm-up unavailable. Start the timed run instead.');
+    setTutorialStatus('invalid', 'Warm-up unavailable. Continue to your selected mode.');
     ui.tutorialContinue.disabled = false;
-    ui.tutorialContinue.textContent = 'Start the timed run';
+    ui.tutorialContinue.textContent = destination.mode === 'practice'
+      ? 'Begin Practice Mode'
+      : 'Start Blaze Mode';
     return;
   }
 
@@ -231,38 +361,84 @@ function rememberTutorial(): void {
 function leaveTutorial(): void {
   tutorialChecker.cancel();
   rememberTutorial();
-  startRun();
+  continuePendingStart();
 }
 
-function startRun(): void {
+function continuePendingStart(): void {
+  const destination = pendingStart;
+  pendingStart = null;
+  if (!destination) returnHome();
+  else if (destination.mode === 'blaze') startBlaze();
+  else startPractice(destination.topic);
+}
+
+function startBlaze(): void {
   tutorialChecker.cancel();
+  activeMode = 'blaze';
+  selectedTopic = null;
+  practiceSession = null;
   game.start();
+  configurePlayScreen('blaze');
   show('play');
   renderBest();
-  renderRail();
+  renderBlazeRail();
   void loadCurrentProblem();
 
   clearInterval(clockTimer);
   clockTimer = setInterval(() => {
-    if (game.tick()) finishRun();
-    renderRail();
+    if (game.tick()) finishBlaze();
+    renderBlazeRail();
   }, 1000);
 
   ui.input.focus();
 }
 
-function finishRun(): void {
+function startPractice(topic: PracticeTopic): void {
+  tutorialChecker.cancel();
+  clearInterval(clockTimer);
+  activeMode = 'practice';
+  selectedTopic = topic;
+
+  const all = problemsForTopic(topic.id);
+  const unfinished = all.filter((problem) => !practiceProgress.has(problem.id));
+  practiceSession = new PracticeSession(unfinished.length > 0 ? unfinished : all);
+  practiceSession.start();
+
+  configurePlayScreen('practice');
+  show('play');
+  renderPracticeRail();
+  void loadCurrentProblem();
+}
+
+function configurePlayScreen(mode: ActiveMode): void {
+  const practice = mode === 'practice';
+  ui.blazeRail.hidden = practice;
+  ui.practiceRail.hidden = !practice;
+  ui.problemPoints.hidden = practice;
+  ui.practiceTools.hidden = !practice;
+  ui.skip.textContent = practice ? 'Later' : 'Skip';
+}
+
+function finishBlaze(): void {
   clearInterval(clockTimer);
   checker.cancel();
   ui.input.disabled = true;
-  renderEnd();
+  renderBlazeEnd();
   show('end');
   ui.again.focus();
 }
 
+function finishPractice(): void {
+  checker.cancel();
+  ui.input.disabled = true;
+  renderPracticeEnd();
+  show('practice-end');
+  ui.practiceAgain.focus();
+}
+
 // ------------------------------------------------------------------ drawing
 
-function renderRail(): void {
+function renderBlazeRail(): void {
   ui.clock.textContent = formatClock(game.secondsLeft);
   ui.score.textContent = String(game.score);
   const remaining = (game.secondsLeft / game.roundSeconds) * 100;
@@ -270,12 +446,38 @@ function renderRail(): void {
   ui.clockFill.classList.toggle('urgent', game.secondsLeft <= 30);
 }
 
+function renderPracticeRail(): void {
+  const topic = selectedTopic;
+  if (!topic) return;
+  const progress = progressForTopic(topic.id, practiceProgress, practiceProblems);
+  ui.practiceTopicLabel.textContent = topic.title;
+  ui.practiceProgressText.textContent = `${progress.completed} of ${progress.total} complete`;
+  ui.practiceProgressFill.style.width = `${(progress.completed / progress.total) * 100}%`;
+}
+
+function activeProblem(): Problem | null {
+  if (activeMode === 'blaze' && game.status === 'running') return game.current;
+  if (activeMode === 'practice' && practiceSession?.status === 'running') {
+    return practiceSession.current;
+  }
+  return null;
+}
+
 async function loadCurrentProblem(): Promise<void> {
-  const problem = game.current;
+  const problem = activeProblem();
+  if (!problem) return;
   awaitingAdvance = false;
 
-  ui.problemNumber.textContent = `Problem ${game.problemNumber}`;
-  ui.problemPoints.textContent = formatPoints(game.currentPoints);
+  if (activeMode === 'blaze') {
+    ui.problemNumber.textContent = `Problem ${game.problemNumber}`;
+    ui.problemPoints.textContent = formatPoints(game.currentPoints);
+  } else {
+    const practiceProblem = problem as PracticeProblem;
+    const topicProblems = problemsForTopic(practiceProblem.topic);
+    const exercise = topicProblems.findIndex((candidate) => candidate.id === problem.id) + 1;
+    ui.problemNumber.textContent = `Exercise ${exercise} of ${topicProblems.length}`;
+    resetPracticeTools(practiceProblem);
+  }
   ui.problemTitle.textContent = problem.title;
   ui.problemDescription.textContent = problem.description;
 
@@ -289,20 +491,27 @@ async function loadCurrentProblem(): Promise<void> {
   setStatus('idle');
 
   const target = await checker.setProblem(problem.latex, problem.preamble);
-  // The run may have ended, or the player may have skipped, while this compiled.
-  if (game.status !== 'running' || game.current !== problem) return;
+  // The session may have ended, or the player may have skipped, while this compiled.
+  if (activeProblem() !== problem) return;
 
   if (!target) {
-    // An authoring bug rather than anything the player did. Do not burn their
-    // clock on an unsolvable problem.
     telemetry.report({ event: 'target_compile_failed', problem: problem.id });
     setStatus('invalid', 'This problem failed to compile. Skipping.');
-    advance(() => game.skip());
+    advanceActive('skip');
     return;
   }
   paint(ui.targetCanvas, target);
   ui.input.disabled = false;
   ui.input.focus();
+}
+
+function resetPracticeTools(problem: PracticeProblem): void {
+  ui.practiceHintText.textContent = problem.hint;
+  ui.practiceHintText.hidden = true;
+  ui.practiceSolutionCode.textContent = problem.latex;
+  ui.practiceSolution.hidden = true;
+  ui.practiceHint.textContent = 'Show hint';
+  ui.practiceReveal.textContent = 'Reveal source';
 }
 
 function clearCanvas(canvas: HTMLCanvasElement): void {
@@ -350,13 +559,15 @@ function onTutorialOutcome({
     ui.tutorialInput.disabled = true;
     rememberTutorial();
     ui.tutorialContinue.disabled = false;
-    ui.tutorialContinue.textContent = 'Start the three-minute run';
+    ui.tutorialContinue.textContent = pendingStart?.mode === 'practice'
+      ? 'Begin Practice Mode'
+      : 'Start Blaze Mode';
     ui.tutorialContinue.focus();
   }
 }
 
 function onCheckOutcome({ status, image }: { status: CheckStatus; image?: ImageData }): void {
-  if (game.status !== 'running' || awaitingAdvance) return;
+  if (!activeProblem() || awaitingAdvance) return;
 
   setStatus(status);
   if (image) paint(ui.attemptCanvas, image);
@@ -365,7 +576,7 @@ function onCheckOutcome({ status, image }: { status: CheckStatus; image?: ImageD
   if (status === 'timeout') telemetry.report({ event: 'compile_timeout' });
   if (status === 'match') {
     ui.input.disabled = true;
-    advance(() => game.solve());
+    advanceActive('solve');
   }
 }
 
@@ -373,19 +584,45 @@ function onCheckOutcome({ status, image }: { status: CheckStatus; image?: ImageD
  * Applies an outcome and deals the next problem after a short beat, so the
  * locked registration mark is legible before the screen changes.
  */
-function advance(apply: () => void): void {
+function advanceActive(outcome: 'solve' | 'skip'): void {
+  const mode = activeMode;
+  if (!mode) return;
   awaitingAdvance = true;
   checker.cancel();
-  apply();
-  renderRail();
+
+  if (mode === 'blaze') {
+    if (outcome === 'solve') game.solve();
+    else game.skip();
+    renderBlazeRail();
+  } else {
+    const session = practiceSession;
+    if (!session || session.status !== 'running') return;
+    if (outcome === 'solve') {
+      practiceProgress = completePracticeProblem(
+        storage,
+        practiceProgress,
+        session.current.id,
+      );
+      session.solve();
+    } else {
+      session.skip();
+    }
+    renderPracticeRail();
+    renderTopics();
+  }
+
   setTimeout(() => {
-    if (game.status !== 'running') return;
-    // loadCurrentProblem takes the focus back once the target is on screen.
+    if (activeMode !== mode) return;
+    if (mode === 'blaze' && game.status !== 'running') return;
+    if (mode === 'practice' && practiceSession?.status === 'complete') {
+      finishPractice();
+      return;
+    }
     void loadCurrentProblem();
   }, 450);
 }
 
-function renderEnd(): void {
+function renderBlazeEnd(): void {
   ui.finalScore.textContent = String(game.score);
   const count = game.solved.length;
   ui.finalSummary.textContent =
@@ -420,6 +657,31 @@ function renderEnd(): void {
   fill(ui.skippedList, game.skipped.map((p) => [p.title, '']), 'Nothing skipped');
 }
 
+function renderPracticeEnd(): void {
+  const topic = selectedTopic;
+  const session = practiceSession;
+  if (!topic || !session) return;
+
+  const progress = progressForTopic(topic.id, practiceProgress, practiceProblems);
+  const complete = progress.completed === progress.total;
+  ui.practiceFinalTitle.textContent = complete ? `${topic.title} complete` : 'Practice paused';
+  ui.practiceFinalSummary.textContent = complete
+    ? `All ${progress.total} ${topic.title.toLowerCase()} exercises are complete.`
+    : `${progress.completed} of ${progress.total} exercises complete. The rest will be waiting for you.`;
+
+  fill(
+    ui.practiceCompletedList,
+    session.completed.map((problem) => [problem.title, 'complete']),
+    'Nothing completed this visit',
+  );
+  fill(
+    ui.practiceLaterList,
+    session.leftForLater.map((problem) => [problem.title, '']),
+    'Nothing left behind',
+  );
+  renderTopics();
+}
+
 function fill(list: HTMLUListElement, rows: [string, string][], empty: string): void {
   list.replaceChildren();
   if (rows.length === 0) {
@@ -442,8 +704,17 @@ function fill(list: HTMLUListElement, rows: [string, string][], empty: string): 
 
 // ------------------------------------------------------------------- events
 
-ui.start.addEventListener('click', beginFromIntro);
-ui.again.addEventListener('click', startRun);
+ui.practiceMode.addEventListener('click', openTopics);
+ui.blazeMode.addEventListener('click', chooseBlaze);
+ui.topicsHome.addEventListener('click', returnHome);
+ui.again.addEventListener('click', startBlaze);
+ui.endHome.addEventListener('click', returnHome);
+ui.practiceExit.addEventListener('click', openTopics);
+ui.practiceAnother.addEventListener('click', openTopics);
+ui.practiceHome.addEventListener('click', returnHome);
+ui.practiceAgain.addEventListener('click', () => {
+  if (selectedTopic) startPractice(selectedTopic);
+});
 
 ui.tutorialInput.addEventListener('input', () => {
   tutorialChecker.update(ui.tutorialInput.value);
@@ -453,13 +724,23 @@ ui.tutorialSkip.addEventListener('click', leaveTutorial);
 ui.tutorialContinue.addEventListener('click', leaveTutorial);
 
 ui.input.addEventListener('input', () => {
-  if (game.status !== 'running' || awaitingAdvance) return;
+  if (!activeProblem() || awaitingAdvance) return;
   checker.update(ui.input.value);
 });
 
 ui.skip.addEventListener('click', () => {
-  if (game.status !== 'running' || awaitingAdvance) return;
-  advance(() => game.skip());
+  if (!activeProblem() || awaitingAdvance) return;
+  advanceActive('skip');
+});
+
+ui.practiceHint.addEventListener('click', () => {
+  ui.practiceHintText.hidden = !ui.practiceHintText.hidden;
+  ui.practiceHint.textContent = ui.practiceHintText.hidden ? 'Show hint' : 'Hide hint';
+});
+
+ui.practiceReveal.addEventListener('click', () => {
+  ui.practiceSolution.hidden = !ui.practiceSolution.hidden;
+  ui.practiceReveal.textContent = ui.practiceSolution.hidden ? 'Reveal source' : 'Hide source';
 });
 
 // A tab in the editor should indent, not leave for the Skip button.
