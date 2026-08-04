@@ -12,6 +12,8 @@
  *    they are absent from the engine's bundles and would need a network fetch.
  *  - Prefer the canonical spelling of anything normalize.ts rewrites, so the
  *    target reads naturally.
+ *  - `title` and `description` are plain text, not LaTeX. They are set with
+ *    textContent, so `$n$` renders as literal dollar signs.
  *
  * scripts/verify-problems.ts compiles every entry, so a violation of any of
  * this fails the build rather than surfacing mid-game.
@@ -43,7 +45,9 @@ export const problems: Problem[] = [
   },
   {
     id: 'sum-squares',
-    title: 'Sum of the First $n$ Squares',
+    // Titles are plain text, not LaTeX: they are set with textContent, so any
+    // $…$ would show as literal dollar signs.
+    title: 'Sum of the First n Squares',
     description: 'Watch the limits.',
     latex: String.raw`\[ \sum_{i=1}^n i^2 = \frac{n(n+1)(2n+1)}{6} \]`,
   },
@@ -73,7 +77,7 @@ export const problems: Problem[] = [
   },
   {
     id: 'limit-e',
-    title: 'A Definition of $e$',
+    title: 'A Definition of e',
     description: 'Limits go underneath.',
     latex: String.raw`\[ e = \lim_{n \to \infty} \left( 1 + \frac{1}{n} \right)^n \]`,
   },
