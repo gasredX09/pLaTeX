@@ -385,4 +385,416 @@ Some opening text.`,
   Less is more.
 \end{quote}`,
   },
+
+  // ------------------------------------------------- second wave: math ---
+  {
+    id: 'sum-cubes',
+    title: 'Sum of the First n Cubes',
+    description: 'A square of a sum.',
+    latex: String.raw`\[ \sum_{i=1}^n i^3 = \left( \frac{n(n+1)}{2} \right)^2 \]`,
+  },
+  {
+    id: 'derivative-limit',
+    title: 'The Derivative',
+    description: 'A limit of a difference quotient.',
+    latex: String.raw`\[ f'(x) = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h} \]`,
+  },
+  {
+    id: 'bayes',
+    title: "Bayes' Theorem",
+    description: 'Conditional bars all the way down.',
+    latex: String.raw`\[ P(A \mid B) = \frac{P(B \mid A) P(A)}{P(B)} \]`,
+  },
+  {
+    id: 'triangle-inequality',
+    title: 'Triangle Inequality',
+    description: 'Absolute values around a sum.',
+    latex: String.raw`\[ |x + y| \le |x| + |y| \]`,
+  },
+  {
+    id: 'bmatrix',
+    title: 'A Bracketed Matrix',
+    description: 'Square brackets, not parentheses.',
+    latex: String.raw`\[ \begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix} \]`,
+  },
+  {
+    id: 'determinant',
+    title: 'A Determinant',
+    description: 'Vertical bars delimit this one.',
+    latex: String.raw`\[ \begin{vmatrix} a & b \\ c & d \end{vmatrix} = ad - bc \]`,
+  },
+  {
+    id: 'nth-root',
+    title: 'An nth Root',
+    description: 'The root takes an optional argument.',
+    latex: String.raw`\[ \sqrt[3]{x^2 + 1} \]`,
+  },
+  {
+    id: 'integral-bounds',
+    title: 'A Definite Integral',
+    description: 'Bounds sit on the integral sign.',
+    latex: String.raw`\[ \int_0^1 x^2 \, dx = \frac{1}{3} \]`,
+  },
+  {
+    id: 'product-notation',
+    title: 'A Product',
+    description: 'Like a sum, with a different operator.',
+    latex: String.raw`\[ n! = \prod_{k=1}^n k \]`,
+  },
+  {
+    id: 'union-intersection',
+    title: 'Indexed Union',
+    description: 'Big operators take limits too.',
+    latex: String.raw`\[ \bigcup_{i=1}^{\infty} A_i \subseteq X \]`,
+  },
+  {
+    id: 'vector-arrow',
+    title: 'A Vector',
+    description: 'An arrow accent, and a dot product.',
+    latex: String.raw`\[ \vec{a} \cdot \vec{b} = |\vec{a}| |\vec{b}| \cos \theta \]`,
+  },
+  {
+    id: 'congruence',
+    title: 'Modular Congruence',
+    description: 'A relation with a parenthetical modulus.',
+    latex: String.raw`\[ a \equiv b \pmod{n} \]`,
+  },
+
+  // --------------------------------------- second wave: text formatting ---
+  {
+    id: 'slanted-text',
+    title: 'Slanted, Not Italic',
+    description: 'Two different oblique shapes.',
+    latex: String.raw`\textsl{slanted} beside \textit{italic}`,
+  },
+  {
+    id: 'bold-italic-nested',
+    title: 'Bold and Italic Together',
+    description: 'One command inside the other.',
+    latex: String.raw`\textbf{\textit{both at once}}`,
+  },
+  {
+    id: 'footnote-size',
+    title: 'Two Smaller Sizes',
+    description: 'Between small and tiny.',
+    latex: String.raw`{\footnotesize footnotesize} then {\tiny tiny}`,
+  },
+  {
+    id: 'huge-text',
+    title: 'The Largest Sizes',
+    description: 'Two steps above large.',
+    latex: String.raw`{\Large Large} {\huge huge}`,
+  },
+  {
+    id: 'flush-right',
+    title: 'Ranged Right',
+    description: 'An environment, like center.',
+    latex: String.raw`\begin{flushright}
+  Against the margin
+\end{flushright}`,
+  },
+  {
+    id: 'flush-left',
+    title: 'Ranged Left',
+    description: 'The opposite of the last one.',
+    latex: String.raw`\begin{flushleft}
+  Against the left
+\end{flushleft}`,
+  },
+  {
+    id: 'line-break',
+    title: 'A Forced Line Break',
+    description: 'Two backslashes end a line.',
+    latex: String.raw`First line \\
+Second line`,
+  },
+  {
+    id: 'nonbreaking-space',
+    title: 'A Space That Will Not Break',
+    description: 'A tie between a name and a number.',
+    latex: String.raw`See Figure~1 on page~7.`,
+  },
+  {
+    id: 'texttt-url',
+    title: 'A Path in Monospace',
+    description: 'Underscores still need escaping.',
+    latex: String.raw`\texttt{/usr/local/my\_file.tex}`,
+  },
+  {
+    id: 'roman-upright',
+    title: 'Upright Inside Italics',
+    description: 'A command to escape the surrounding shape.',
+    latex: String.raw`\textit{italic with \textup{upright} inside}`,
+  },
+
+  // ---------------------------------- second wave: accents and symbols ---
+  {
+    id: 'ring-macron',
+    title: 'Ring and Macron',
+    description: 'Two more accent commands.',
+    latex: String.raw`\r{A}ngstr\"om, \=o`,
+  },
+  {
+    id: 'dotless-i',
+    title: 'A Dotless i',
+    description: 'The dot would collide with the accent.',
+    latex: String.raw`\'{\i} and \^{\j}`,
+  },
+  {
+    id: 'special-letters',
+    title: 'Letters Beyond ASCII',
+    description: 'Whole letters, not accents.',
+    latex: String.raw`\ae, \oe, \o, \ss, \AA`,
+  },
+  {
+    id: 'math-relations',
+    title: 'Relation Symbols',
+    description: 'Four relations in a row.',
+    latex: String.raw`\[ \approx, \sim, \propto, \equiv \]`,
+  },
+  {
+    id: 'arrows-math',
+    title: 'Arrows',
+    description: 'Short and long, both directions.',
+    latex: String.raw`\[ \to, \gets, \mapsto, \leftrightarrow \]`,
+  },
+  {
+    id: 'blackboard-bold',
+    title: 'Number Sets',
+    description: 'Blackboard bold needs amssymb.',
+    latex: String.raw`\[ \mathbb{N} \subset \mathbb{Z} \subset \mathbb{Q} \subset \mathbb{R} \]`,
+  },
+  {
+    id: 'calligraphic',
+    title: 'Script and Fraktur',
+    description: 'Two decorative maths alphabets.',
+    latex: String.raw`\[ \mathcal{F}, \mathfrak{g} \]`,
+  },
+  {
+    id: 'degrees-percent',
+    title: 'Degrees and Ordinals',
+    description: 'Text symbols from textcomp.',
+    latex: String.raw`23\textdegree C, 5\textperthousand`,
+  },
+
+  // ----------------------------------------------- second wave: lists ---
+  {
+    id: 'enumerate-nested',
+    title: 'Numbered Inside Numbered',
+    description: 'The inner labels change style.',
+    latex: String.raw`\begin{enumerate}
+  \item Outer
+  \begin{enumerate}
+    \item Inner
+  \end{enumerate}
+\end{enumerate}`,
+  },
+  {
+    id: 'itemize-in-enumerate',
+    title: 'Bullets Inside Numbers',
+    description: 'Two list kinds, one inside the other.',
+    latex: String.raw`\begin{enumerate}
+  \item Step
+  \begin{itemize}
+    \item Detail
+  \end{itemize}
+\end{enumerate}`,
+  },
+  {
+    id: 'itemize-custom-label',
+    title: 'A Chosen Bullet',
+    description: 'The optional argument overrides the marker.',
+    latex: String.raw`\begin{itemize}
+  \item[--] Dashed
+  \item[*] Starred
+\end{itemize}`,
+  },
+  {
+    id: 'description-two-lines',
+    title: 'A Longer Description',
+    description: 'Three labelled entries.',
+    latex: String.raw`\begin{description}
+  \item[One] First
+  \item[Two] Second
+  \item[Three] Third
+\end{description}`,
+  },
+
+  // ---------------------------------------------- second wave: tables ---
+  {
+    id: 'tabular-centered-cols',
+    title: 'All Columns Centred',
+    description: 'Three centred columns with a rule.',
+    latex: String.raw`\begin{tabular}{ccc}
+  \hline
+  a & b & c \\
+  \hline
+\end{tabular}`,
+  },
+  {
+    id: 'tabular-cline',
+    title: 'A Partial Rule',
+    description: 'A rule under some columns only.',
+    latex: String.raw`\begin{tabular}{|c|c|}
+  \hline
+  1 & 2 \\
+  \cline{2-2}
+  3 & 4 \\
+  \hline
+\end{tabular}`,
+  },
+  {
+    id: 'tabular-fixed-width',
+    title: 'A Wrapping Column',
+    description: 'The p column takes a width.',
+    latex: String.raw`\begin{tabular}{|p{2cm}|c|}
+  \hline
+  Wraps onto lines & 7 \\
+  \hline
+\end{tabular}`,
+  },
+  {
+    id: 'tabular-double-rule',
+    title: 'A Doubled Rule',
+    description: 'Two bars in the column spec.',
+    latex: String.raw`\begin{tabular}{c||c}
+  a & b \\
+  c & d
+\end{tabular}`,
+  },
+
+  // ------------------------------------ second wave: boxes and spacing ---
+  {
+    id: 'framebox-width',
+    title: 'A Box of Fixed Width',
+    description: 'A framed box with a set width.',
+    latex: String.raw`\framebox[3cm]{centred}`,
+  },
+  {
+    id: 'parbox',
+    title: 'A Paragraph Box',
+    description: 'Text wrapped to a given width.',
+    latex: String.raw`\parbox{3cm}{This text wraps inside the box.}`,
+  },
+  {
+    id: 'raisebox',
+    title: 'Lifted Off the Baseline',
+    description: 'A box raised by a length.',
+    latex: String.raw`base \raisebox{2mm}{lifted} base`,
+  },
+  {
+    id: 'rule-line',
+    title: 'A Drawn Rule',
+    description: 'Width then height.',
+    latex: String.raw`before \rule{2cm}{1pt} after`,
+  },
+  {
+    id: 'quad-spacing',
+    title: 'Quad Spaces',
+    description: 'Two sizes of maths space.',
+    latex: String.raw`\[ a \quad b \qquad c \]`,
+  },
+  {
+    id: 'thin-negative-space',
+    title: 'Thin and Negative Space',
+    description: 'One nudges apart, one pulls together.',
+    latex: String.raw`\[ a\,b \quad c\!d \]`,
+  },
+
+  // ------------------------------------------------ second wave: tikz ---
+  {
+    id: 'tikz-dashed-line',
+    title: 'A Dashed Path',
+    description: 'A line style option.',
+    latex: String.raw`\begin{tikzpicture}
+  \draw[dashed] (0,0) -- (3,0);
+\end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
+  },
+  {
+    id: 'tikz-double-arrow',
+    title: 'An Arrow Both Ways',
+    description: 'Tips at each end.',
+    latex: String.raw`\begin{tikzpicture}
+  \draw[<->] (0,0) -- (3,0);
+\end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
+  },
+  {
+    id: 'tikz-grid',
+    title: 'A Grid',
+    description: 'One path operation draws it all.',
+    latex: String.raw`\begin{tikzpicture}
+  \draw[step=5mm] (0,0) grid (2,1);
+\end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
+  },
+  {
+    id: 'tikz-arc',
+    title: 'An Arc',
+    description: 'Start angle, end angle, radius.',
+    latex: String.raw`\begin{tikzpicture}
+  \draw (0,0) arc (0:90:1cm);
+\end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
+  },
+  {
+    id: 'tikz-two-nodes',
+    title: 'Two Joined Nodes',
+    description: 'Nodes named, then connected.',
+    latex: String.raw`\begin{tikzpicture}
+  \node (a) at (0,0) {A};
+  \node (b) at (2,0) {B};
+  \draw[->] (a) -- (b);
+\end{tikzpicture}`,
+    preamble: String.raw`\usepackage{tikz}`,
+  },
+
+  // ------------------------------------- second wave: document structure ---
+  {
+    id: 'subsection-star',
+    title: 'A Subsection',
+    description: 'One level below a section.',
+    latex: String.raw`\subsection*{Method}
+A line of text.`,
+  },
+  {
+    id: 'paragraph-break',
+    title: 'Two Paragraphs',
+    description: 'A blank line separates them, and the second indents.',
+    latex: String.raw`First paragraph here.
+
+Second paragraph here.`,
+  },
+  {
+    id: 'noindent-paragraph',
+    title: 'An Unindented Paragraph',
+    description: 'Suppress the indent on the second.',
+    latex: String.raw`First paragraph.
+
+\noindent Second, flush left.`,
+  },
+  {
+    id: 'quotation-environment',
+    title: 'A Longer Quotation',
+    description: 'Like quote, but it indents each paragraph.',
+    latex: String.raw`\begin{quotation}
+  A longer passage set in from both margins.
+\end{quotation}`,
+  },
+  {
+    id: 'verse-environment',
+    title: 'Verse',
+    description: 'For poetry; lines break explicitly.',
+    latex: String.raw`\begin{verse}
+  One line \\
+  Another line
+\end{verse}`,
+  },
+  {
+    id: 'colored-box-text',
+    title: 'Colour on a Box',
+    description: 'A coloured frame around coloured text.',
+    latex: String.raw`\fcolorbox{red}{yellow}{\textcolor{blue}{warning}}`,
+  },
 ];

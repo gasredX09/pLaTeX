@@ -32,14 +32,18 @@ describe('practice progress', () => {
 
   it('reports progress within one topic only', () => {
     const math = practiceProblems.filter((problem) => problem.topic === 'math');
+    const lists = practiceProblems.filter((problem) => problem.topic === 'lists');
     const progress = new Set([math[0]!.id, math[1]!.id]);
+    // Totals come from the catalog rather than a literal, so growing a topic
+    // does not require editing this expectation.
     expect(progressForTopic('math', progress, practiceProblems)).toEqual({
       completed: 2,
-      total: 3,
+      total: math.length,
     });
+    // Completing maths exercises must not count towards another topic.
     expect(progressForTopic('lists', progress, practiceProblems)).toEqual({
       completed: 0,
-      total: 3,
+      total: lists.length,
     });
   });
 

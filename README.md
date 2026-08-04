@@ -9,9 +9,11 @@ The wordmark is set with LaTeX's own logo kerning, with gentler pulls than the
 canonical ratios because the interface is monospaced. See `.logotype` in
 `src/styles.css`.
 
-Practice Mode has 24 ordered exercises across maths, text formatting, accents
-and symbols, lists, tables, boxes and spacing, TikZ, and document structure.
-Blaze Mode uses a completely separate catalog of 45 shuffled problems.
+Practice Mode has 48 ordered exercises, six per topic in two tiers, across maths,
+text formatting, accents and symbols, lists, tables, boxes and spacing, TikZ, and
+document structure. Blaze Mode uses a completely separate catalog of 100 shuffled
+problems, so a three-minute run of roughly eight problems does not repeat itself
+for a long while.
 
 ## How it decides you are right
 
@@ -145,8 +147,8 @@ Cross-Origin-Embedder-Policy: require-corp
 ```
 
 Its own documentation lists this as a requirement, but it is not one: the code
-falls back to a plain `ArrayBuffer`. Measured without the headers, all 69
-problems still compile and the median compile goes from 101ms to 115ms. Set them
+falls back to a plain `ArrayBuffer`. Measured without the headers, every problem
+still compiles and the median compile goes from 101ms to 115ms. Set them
 if you can, but their absence is a performance note, not a blocker.
 
 ### Size

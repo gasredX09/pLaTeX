@@ -13,6 +13,10 @@ import { preview } from 'vite';
 import { TUTORIAL } from '../src/onboarding.js';
 import { practiceProblems, practiceTopics } from '../src/practiceProblems.js';
 
+/** Exercises in the maths topic. Derived, so growing the catalog cannot stale
+ *  these expectations the way a hardcoded count did. */
+const MATHS_TOTAL = practiceProblems.filter((problem) => problem.topic === 'math').length;
+
 const server = await preview({
   configFile: new URL('../vite.config.ts', import.meta.url).pathname,
   preview: { port: 0 },
@@ -124,8 +128,11 @@ try {
       { timeout: 60_000 },
     );
     await practicePage.waitForFunction(
-      () => document.getElementById('practice-progress-text')?.textContent?.startsWith('1 of 3'),
-      null,
+      (total: number) =>
+        document
+          .getElementById('practice-progress-text')
+          ?.textContent?.startsWith(`1 of ${total}`) ?? false,
+      MATHS_TOTAL,
       { timeout: 10_000 },
     );
     check('practice completion updates without a score', true);
@@ -134,7 +141,8 @@ try {
   await practicePage.click('#practice-exit');
   check(
     'practice progress appears on topic selection',
-    (await practicePage.locator('[data-topic="math"] .topic-card-progress').textContent()) === '1/3',
+    (await practicePage.locator('[data-topic="math"] .topic-card-progress').textContent()) ===
+      `1/${MATHS_TOTAL}`,
   );
 
   await practicePage.reload({ waitUntil: 'domcontentloaded' });
@@ -142,7 +150,8 @@ try {
   await practicePage.click('#practice-mode');
   check(
     'practice progress survives a reload',
-    (await practicePage.locator('[data-topic="math"] .topic-card-progress').textContent()) === '1/3',
+    (await practicePage.locator('[data-topic="math"] .topic-card-progress').textContent()) ===
+      `1/${MATHS_TOTAL}`,
   );
 } catch (err) {
   failures.push(err instanceof Error ? err.message : String(err));
