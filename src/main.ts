@@ -23,6 +23,8 @@ import { TexEngine } from './tex/engine.js';
 import { PRELOAD_BUNDLES } from './tex/document.js';
 import { FIRST_VISIT_MB } from './tex/warmProgress.js';
 import { AttemptChecker, type CheckStatus } from './tex/compileQueue.js';
+import { planKey, planIndent } from './editor/autoPairs.js';
+import { applyEdit } from './editor/textareaEdit.js';
 import { paint } from './render/rasterize.js';
 import {
   completeTutorial,
@@ -743,24 +745,34 @@ ui.practiceReveal.addEventListener('click', () => {
   ui.practiceReveal.textContent = ui.practiceSolution.hidden ? 'Reveal source' : 'Hide source';
 });
 
-// A tab in the editor should indent, not leave for the Skip button.
-function indentEditor(
-  event: KeyboardEvent,
-  input: HTMLTextAreaElement,
-  attemptChecker: AttemptChecker,
-): void {
-  if (event.key !== 'Tab' || event.shiftKey) return;
+/**
+ * Editor keys: Tab indents rather than leaving for the Skip button, and
+ * delimiters close themselves.
+ *
+ * Both go through applyEdit, which performs the change as the user rather than
+ * assigning to `value`. That keeps the native undo stack intact, and means the
+ * browser fires `input` itself, so the recompile is triggered by the existing
+ * listener and must not be triggered again here.
+ */
+function handleEditorKey(event: KeyboardEvent, input: HTMLTextAreaElement): void {
+  // Leave shortcuts and IME composition alone. Cmd-[ is browser navigation, and
+  // a composing keystroke is not a finished character yet.
+  if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return;
+
+  if (event.key === 'Tab' && !event.shiftKey) {
+    event.preventDefault();
+    applyEdit(input, planIndent(input));
+    return;
+  }
+
+  const edit = planKey(input, event.key);
+  if (!edit) return;
   event.preventDefault();
-  const { selectionStart, selectionEnd, value } = input;
-  input.value = `${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`;
-  input.selectionStart = input.selectionEnd = selectionStart + 2;
-  attemptChecker.update(input.value);
+  applyEdit(input, edit);
 }
 
-ui.input.addEventListener('keydown', (event) => {
-  indentEditor(event, ui.input, checker);
-});
-
-ui.tutorialInput.addEventListener('keydown', (event) => {
-  indentEditor(event, ui.tutorialInput, tutorialChecker);
-});
+for (const editor of [ui.input, ui.tutorialInput]) {
+  editor.addEventListener('keydown', (event) => {
+    handleEditorKey(event, editor);
+  });
+}

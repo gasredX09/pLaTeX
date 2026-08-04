@@ -39,6 +39,35 @@ Your Blaze best and Practice completion are kept separately in the browser's
 local storage. There is no server, so both are per browser and per device. A
 scoreless Blaze run is never recorded, and a tie does not count as beating it.
 
+## The editor
+
+Delimiters close themselves, in a way that knows some LaTeX:
+
+| You type | You get |
+| --- | --- |
+| `{` `(` `[` | `{}` `()` `[]`, caret inside |
+| `$` | `$$`, caret inside |
+| `\{` | `\{\}` — an escaped brace pairs with an escaped brace, not a bare `}` |
+| `\[` `\(` | `\[\]` `\(\)`, the maths delimiters |
+| `\$` | just `\$`; a literal dollar sign has no partner |
+| `\\{` | `\\{}`; the `\\` is a row break, so the brace is ordinary |
+| a closer that is already there | the caret steps over it rather than doubling it |
+| `$` while inside maths | one `$` to close, not a new pair |
+| a delimiter with text selected | the selection is wrapped, and stays selected |
+| Backspace between an empty pair | both halves go, including `\{\}` |
+
+Two consequences worth stating, because they are the whole risk of the feature:
+
+- **Typing a problem's source verbatim reproduces it exactly.** Every closer you
+  type is stepped over rather than duplicated. `autoPairs.test.ts` asserts this
+  for six real problems, character by character; without it, auto-pairing would
+  make problems unsolvable.
+- **Native undo still works.** Edits are applied through `execCommand` so the
+  browser performs them as if you had, rather than by assigning to `value`, which
+  would clear the undo stack and lose everything typed so far.
+
+`Tab` inserts two spaces. Modifier chords and IME composition are left alone.
+
 ## Setup
 
 ```bash
@@ -63,6 +92,7 @@ npm run verify           # everything below, in order
 | `npm run smoke` | Engine init, cross-origin isolation, render determinism, equivalent-markup matching, near-miss rejection, recovery from a runaway macro |
 | `npm run verify:problems` | Every problem compiles, renders non-blank, fits one page, stays inside the margins, and loads only bundled packages |
 | `npm run verify:best` | The personal best across several runs: first record, missed record, beaten record, and survival of a reload |
+| `npm run verify:editor` | Auto-closing delimiters driven by real keystrokes, that undo survives, and that a problem typed key by key still solves |
 | `npm run verify:build` | Both modes actually play through the production bundle, including persisted practice progress |
 | `npm run shots` | Screenshots of every screen and state, for design review |
 
@@ -208,6 +238,9 @@ src/
   render/
     rasterize.ts       PDF bytes to pixels via pdf.js
     compare.ts         strict pixel equality                         [tested]
+  editor/
+    autoPairs.ts       which delimiter to close, and how              [tested]
+    textareaEdit.ts    applies an edit without losing native undo
 ```
 
 ## Notes on the design
