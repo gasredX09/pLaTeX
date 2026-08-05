@@ -31,18 +31,29 @@ function checkEq(name: string, actual: string, expected: string): void {
 }
 
 const text = async (sel: string) => (await page.textContent(sel))?.trim() ?? '';
+
+/** Names what a wait was for, so a timeout is diagnosable rather than anonymous. */
+async function waiting<T>(what: string, action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    throw new Error(`${what}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 const value = () =>
   page.evaluate(() => (document.getElementById('input') as HTMLTextAreaElement).value);
 
 /** Waits until the editor is live and carries its pre-filled broken source. */
-async function waitForRepair(): Promise<void> {
-  await page.waitForFunction(
+async function waitForRepair(label = 'a repair loads'): Promise<void> {
+  await waiting(label, () =>
+    page.waitForFunction(
     () => {
       const editor = document.getElementById('input') as HTMLTextAreaElement;
-      return !!editor && !editor.disabled && editor.value.length > 0;
-    },
-    null,
-    { timeout: 90_000 },
+        return !!editor && !editor.disabled && editor.value.length > 0;
+      },
+      null,
+      { timeout: 90_000 },
+    ),
   );
 }
 
@@ -134,18 +145,21 @@ try {
   let seenAgain = false;
   for (let i = 0; i < FIXIT_ROUND_SIZE * 2; i++) {
     if (await page.locator('#practice-end').isVisible()) break;
-    await waitForRepair();
-    if ((await text('#problem-title')) === deferred) seenAgain = true;
+    await waitForRepair(`repair ${i + 1} loads`);
+    const onScreen = await text('#problem-title');
+    if (onScreen === deferred) seenAgain = true;
     const answer = await correctSource();
     if (!answer) {
       failures.push(`no answer for "${await text('#problem-title')}"`);
       break;
     }
     await page.fill('#input', answer);
-    await page.waitForFunction(
-      () => document.getElementById('status')?.className.includes('match') ?? false,
-      null,
-      { timeout: 60_000 },
+    await waiting(`"${onScreen}" registers as repaired`, () =>
+      page.waitForFunction(
+        () => document.getElementById('status')?.className.includes('match') ?? false,
+        null,
+        { timeout: 60_000 },
+      ),
     );
     await page.waitForTimeout(700);
   }
