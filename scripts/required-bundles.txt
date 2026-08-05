@@ -1,12 +1,15 @@
 # Package bundles the game can actually reach, one per line.
 #
-# The engine ships 61; these 17 are the ones any problem in the set resolves to.
+# The engine ships 61; these 16 are the ones any problem in the set resolves to.
 # The rest are ~130MB that nothing can load, so they are neither deployed nor
 # uploaded. Read by fetch-tex-assets.sh and upload-tex-assets.sh.
 #
-# To re-derive: run `npm run verify:problems`, whose log lines list the bundles
-# each compile requires. Extend this whenever a problem adds a \usepackage, or
-# that problem will fail to compile in production while passing locally.
+# Do not hand-maintain this against guesswork. `npm run verify:problems` records
+# every bundle the content actually fetches and fails if one is missing from this
+# list, which is the only reason `\$` in text was caught: locally all 61 bundles
+# are present, so a document needing a deferred one still compiles, while the
+# deploy ships only what is listed here and 404s. The same run reports anything
+# listed but never fetched, so this file can be trimmed safely.
 
 # engine and format
 core
@@ -15,7 +18,9 @@ l3
 dvips
 extra-maps
 
-# fonts
+# fonts. The lm set is not optional: the shared preamble uses Latin Modern with
+# T1 encoding specifically so a text dollar sign does not reach for cm-super,
+# which is 56.7MB and fetched on demand.
 fonts-cm
 fonts-cmextra
 fonts-lm-tfm
@@ -28,7 +33,6 @@ amsmath
 graphics
 tex-latex-misc
 xcolor
-tables
 
-# loaded only by the four TikZ problems, warmed in the background
+# loaded only by the TikZ problems, warmed in the background
 pgf-tikz

@@ -187,7 +187,18 @@ is needed.
 
 ## Hosting
 
-### The one hard requirement
+### Two hard requirements
+
+**Deploy every bundle the content needs.** `scripts/required-bundles.txt` lists
+the 16 bundles the game can reach, and only those are deployed. The trap is that
+the engine fetches some bundles *on demand*: locally all 61 are present, so a
+document that quietly needs a deferred one compiles fine, while in production the
+same document 404s. `npm run verify:problems` records every bundle a full run
+fetches and fails if one is missing from the list, which is the only reason a text
+dollar sign was caught — under OT1 encoding `\$` reaches for `cm-super`, 56.7MB
+and unlisted. The shared preamble now uses Latin Modern with T1 encoding so that
+glyph comes from fonts already deployed. The same run reports bundles listed but
+never fetched, so the list can be trimmed safely.
 
 **Serve `tex/bundles/*.data.gz` as opaque bytes.** Static hosts see the `.gz`
 extension and add `Content-Encoding: gzip`, so the browser silently decompresses

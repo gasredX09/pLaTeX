@@ -44,9 +44,19 @@ export const PAGE_HEIGHT_MM = 32;
  *
  * xcolor stays. It is 0.1MB, and its one dependency outside that (colortbl) sits
  * in tex-latex-misc, which `geometry` already brings in.
+ *
+ * lmodern with T1 encoding is here for a subtler reason than typography. Under
+ * the default OT1 encoding, a text dollar sign (`\$`) is not in the deployed
+ * Computer Modern fonts, so TeX reaches for cm-super — a 56.7MB bundle that is
+ * fetched on demand and was not on the deploy list, which is how `\$` came to
+ * fail in production while compiling perfectly here. Latin Modern is Computer
+ * Modern's own successor and its T1 fonts are already deployed, so this fixes
+ * the glyph without the download. T1 is better practice regardless.
  */
 export const PREAMBLE = String.raw`
 \usepackage[paperwidth=${PAGE_WIDTH_MM}mm,paperheight=${PAGE_HEIGHT_MM}mm,margin=3mm]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{array}
@@ -61,6 +71,8 @@ export const PREAMBLE = String.raw`
  * fetch. scripts/check-packages.ts enforces this at build time.
  */
 export const BUNDLED_PACKAGES = [
+  'lmodern',
+  'fontenc',
   'amsmath',
   'amssymb',
   'amsfonts',

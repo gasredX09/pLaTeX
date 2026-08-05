@@ -35,6 +35,18 @@ function checkEq(name: string, actual: string, expected: string): void {
 
 const text = async (selector: string) => (await page.textContent(selector))?.trim() ?? '';
 
+/**
+ * Wraps a wait so a timeout says what it was waiting for. Without this a failure
+ * is an anonymous "Timeout 90000ms exceeded" and says nothing about where.
+ */
+async function waiting<T>(what: string, action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    throw new Error(`${what}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 /** Which stage buttons are enabled, in order. */
 const openStages = () =>
   page.evaluate(() =>
@@ -96,10 +108,12 @@ try {
 
     if (stage.example) {
       // A caption promising a render must be accompanied by one.
-      await page.waitForFunction(
-        () => (document.getElementById('lesson-example-canvas') as HTMLCanvasElement).width > 0,
-        null,
-        { timeout: 90_000 },
+      await waiting(`stage ${index + 1} worked example renders`, () =>
+        page.waitForFunction(
+          () => (document.getElementById('lesson-example-canvas') as HTMLCanvasElement).width > 0,
+          null,
+          { timeout: 90_000 },
+        ),
       );
       const shown = await text('#lesson-example-source');
       if (shown !== stage.example.source) {
@@ -119,21 +133,27 @@ try {
         await page.click('#practice-hint');
         check('a hint is available', (await text('#practice-hint-text')).length > 0);
       }
-      await page.waitForFunction(
-        () => !(document.getElementById('input') as HTMLTextAreaElement).disabled,
-        null,
-        { timeout: 90_000 },
+      await waiting(`stage ${index + 1} exercise becomes editable`, () =>
+        page.waitForFunction(
+          () => !(document.getElementById('input') as HTMLTextAreaElement).disabled,
+          null,
+          { timeout: 90_000 },
+        ),
       );
       await page.fill('#input', stage.exercise.latex);
-      await page.waitForFunction(
-        () => document.getElementById('status')?.className.includes('match') ?? false,
-        null,
-        { timeout: 60_000 },
+      await waiting(`stage ${index + 1} answer registers`, () =>
+        page.waitForFunction(
+          () => document.getElementById('status')?.className.includes('match') ?? false,
+          null,
+          { timeout: 60_000 },
+        ),
       );
     }
 
     if (index < courseStages.length - 1) {
-      await page.waitForSelector('#course-map:not([hidden])', { timeout: 30_000 });
+      await waiting(`stage ${index + 1} returns to the map`, () =>
+        page.waitForSelector('#course-map:not([hidden])', { timeout: 30_000 }),
+      );
       const open = (await openStages()).filter(Boolean).length;
       check(`finishing stage ${index + 1} opens stage ${index + 2}`, open === index + 2, `${open}`);
     }
