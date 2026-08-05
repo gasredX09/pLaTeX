@@ -7,8 +7,9 @@
  */
 import { TexEngine } from './tex/engine.js';
 import { rasterizeFirstPage } from './render/rasterize.js';
-import { blazeProblems } from './problems.js';
+import { blazeProblems, type Problem } from './problems.js';
 import { practiceProblems } from './practiceProblems.js';
+import { courseStages, courseExercises } from './course.js';
 import { normalize } from './normalize.js';
 import { BUNDLED_PACKAGES } from './tex/document.js';
 import { candidateBreaks } from './fixit.js';
@@ -70,7 +71,22 @@ function inspectInk(image: ImageData): Ink {
 async function main(): Promise<void> {
   const engine = new TexEngine();
   await engine.warm();
-  const problems = [...blazeProblems, ...practiceProblems];
+  // Worked examples are held to the same standard as exercises: a lesson that
+  // shows a broken render teaches the wrong thing. They are given synthetic ids
+  // so failures name the stage they belong to.
+  const examples: Problem[] = courseStages
+    .filter((stage) => stage.example)
+    .map((stage) => ({
+      id: `${stage.id}-example`,
+      title: stage.title,
+      description: stage.example!.caption,
+      latex: stage.example!.source,
+      ...(stage.example!.preamble ? { preamble: stage.example!.preamble } : {}),
+    }));
+
+  const problems = [...blazeProblems, ...practiceProblems, ...courseExercises, ...examples];
+  /** Only Blaze feeds Fix-it, so only Blaze needs a breakable mutation. */
+  const fixitSources = new Set(blazeProblems.map((problem) => problem.id));
   log(`Verifying ${problems.length} problems\n`);
 
   let failed = 0;
@@ -110,6 +126,8 @@ async function main(): Promise<void> {
       if (!ink.any) issues.push('renders a blank page');
       if (ink.touchesEdge) issues.push('content runs off the page');
 
+      // Fix-it draws only from the Blaze catalog, so Practice exercises, course
+      // exercises and worked examples are exempt from the mutation invariant.
       // Fix-it hands the player a generated mutation of this source, and at run
       // time walks the candidates until one is genuinely wrong. That search is
       // only guaranteed to terminate usefully if at least one candidate is a
@@ -119,10 +137,10 @@ async function main(): Promise<void> {
       // compiles and still renders the target exactly, because dropping a final
       // brace only leaves a group that closes at end of document, and a tie
       // typesets like a space unless the line breaks there.
-      const candidates = candidateBreaks(problem);
-      if (candidates.length === 0) {
+      const candidates = fixitSources.has(problem.id) ? candidateBreaks(problem) : [];
+      if (fixitSources.has(problem.id) && candidates.length === 0) {
         issues.push('cannot be broken, so Fix-it will never offer it');
-      } else {
+      } else if (candidates.length > 0) {
         let playable: string | null = null;
         const noOps: string[] = [];
         for (const candidate of candidates) {

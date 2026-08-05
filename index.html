@@ -56,6 +56,11 @@
       </p>
 
       <div class="mode-grid" aria-label="Choose a mode">
+        <button class="mode-card mode-card-course" id="course-mode" disabled>
+          <span class="mode-name">Tutorial</span>
+          <span class="mode-description">Never written LaTeX? Start here. Nine short stages.</span>
+          <span class="mode-action">Begin the tutorial</span>
+        </button>
         <button class="mode-card" id="practice-mode" disabled>
           <span class="mode-name">Practice Mode</span>
           <span class="mode-description">Learn topic by topic. No clock, no score.</span>
@@ -114,6 +119,65 @@
 
       <div class="screen-actions">
         <button class="button" id="topics-home">Back to mode selection</button>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- course map -->
+    <section class="screen" id="course-map" hidden>
+      <p class="screen-mark">
+        <span class="logotype logotype-small"
+          >p<span class="logotype-l">L</span><span class="logotype-a">a</span>T<span
+            class="logotype-e"
+            >e</span
+          >X</span
+        >
+      </p>
+
+      <header class="masthead topic-masthead">
+        <p class="eyebrow">Tutorial</p>
+        <h1 class="section-title">Your way in</h1>
+        <p class="standfirst" id="course-standfirst">
+          Nine stages, in order. Each one explains an idea, shows a worked example,
+          then asks you to write one thing yourself.
+        </p>
+      </header>
+
+      <ol class="stage-path" id="stage-list"></ol>
+
+      <div class="screen-actions">
+        <button class="button" id="course-home">Back to mode selection</button>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------- lesson -->
+    <section class="screen" id="lesson" hidden>
+      <p class="screen-mark">
+        <span class="logotype logotype-small"
+          >p<span class="logotype-l">L</span><span class="logotype-a">a</span>T<span
+            class="logotype-e"
+            >e</span
+          >X</span
+        >
+      </p>
+
+      <header class="masthead lesson-masthead">
+        <p class="eyebrow" id="lesson-stage">Stage 1 of 9</p>
+        <h1 class="section-title" id="lesson-title">—</h1>
+      </header>
+
+      <div class="lesson-body" id="lesson-body"></div>
+
+      <figure class="worked-example" id="lesson-example" hidden>
+        <figcaption class="label" id="lesson-example-caption"></figcaption>
+        <div class="worked-example-grid">
+          <pre class="lesson-source"><code id="lesson-example-source"></code></pre>
+          <div class="paper"><canvas id="lesson-example-canvas"></canvas></div>
+        </div>
+      </figure>
+
+      <div class="screen-actions">
+        <button class="button button-primary" id="lesson-continue">Start the exercise</button>
+        <button class="button" id="lesson-back">Back to the map</button>
       </div>
     </section>
 

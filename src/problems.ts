@@ -762,6 +762,9 @@ A line of text.`,
     id: 'paragraph-break',
     title: 'Two Paragraphs',
     description: 'A blank line separates them, and the second indents.',
+    // The shared preamble zeroes \parindent, which would make this render
+    // identically to a line break and let \\ pass as a correct answer.
+    preamble: String.raw`\setlength{\parindent}{1em}`,
     latex: String.raw`First paragraph here.
 
 Second paragraph here.`,
@@ -770,6 +773,8 @@ Second paragraph here.`,
     id: 'noindent-paragraph',
     title: 'An Unindented Paragraph',
     description: 'Suppress the indent on the second.',
+    // \noindent has nothing to suppress unless the indent exists.
+    preamble: String.raw`\setlength{\parindent}{1em}`,
     latex: String.raw`First paragraph.
 
 \noindent Second, flush left.`,

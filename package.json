@@ -12,14 +12,15 @@
     "test:watch": "vitest",
     "smoke": "tsx scripts/smoke.ts",
     "verify:problems": "tsx scripts/verify-problems.ts",
-    "verify": "npm run test && npm run smoke && npm run verify:problems && npm run verify:best && npm run verify:editor && npm run verify:fixit && npm run build && npm run verify:build",
+    "verify": "npm run test && npm run smoke && npm run verify:problems && npm run verify:best && npm run verify:editor && npm run verify:fixit && npm run verify:course && npm run build && npm run verify:build",
     "shots": "tsx scripts/shots.ts",
     "verify:build": "tsx scripts/verify-build.ts",
     "verify:best": "tsx scripts/verify-personal-best.ts",
     "setup:worker": "bash scripts/copy-worker.sh",
     "upload:tex": "bash scripts/upload-tex-assets.sh",
     "verify:editor": "tsx scripts/verify-editor.ts",
-    "verify:fixit": "tsx scripts/verify-fixit.ts"
+    "verify:fixit": "tsx scripts/verify-fixit.ts",
+    "verify:course": "tsx scripts/verify-course.ts"
   },
   "dependencies": {
     "@siglum/engine": "^0.1.4",

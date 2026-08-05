@@ -963,3 +963,174 @@ code {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------------- the tutorial */
+
+/*
+ * The map is a numbered path rather than a grid of cards, because the whole
+ * point of Tutorial Mode is that the order matters. The connecting rule is drawn
+ * behind the markers so it reads as one route, and each stage carries its state
+ * in the marker: filled when done, outlined when it is the one to do next, and
+ * hollow when still locked.
+ */
+.stage-path {
+  list-style: none;
+  margin: 0 0 calc(var(--step) * 4);
+  padding: 0;
+  position: relative;
+}
+
+/* The route itself, behind the markers. */
+.stage-path::before {
+  content: "";
+  position: absolute;
+  top: 1.6rem;
+  bottom: 1.6rem;
+  left: 0.85rem;
+  width: 1px;
+  background: var(--rule);
+}
+
+.stage-row {
+  position: relative;
+}
+
+.stage-card {
+  display: grid;
+  grid-template-columns: 1.7rem 1fr;
+  align-items: baseline;
+  gap: 0.2rem 1rem;
+  width: 100%;
+  text-align: left;
+  padding: calc(var(--step) * 1.5) 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.stage-card:disabled {
+  cursor: not-allowed;
+  color: var(--ink-faint);
+}
+
+/* The marker sits on the route, so it needs the page colour behind it. */
+.stage-marker {
+  grid-row: span 2;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--machine);
+  font-size: 0.75rem;
+  background: var(--ground);
+  position: relative;
+  z-index: 1;
+}
+
+.stage-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.stage-summary {
+  grid-column: 2;
+  color: var(--ink-soft);
+  font-size: 0.9375rem;
+}
+
+.stage-card:disabled .stage-summary {
+  color: var(--ink-faint);
+}
+
+.stage-card:hover:not(:disabled) .stage-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Done: the marker is filled and carries a printed tick. */
+.stage-row.is-done .stage-marker {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* Current: the one to do next, marked in the ink used for emphasis elsewhere. */
+.stage-row.is-current .stage-marker {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--ground), 0 0 0 4px var(--ink);
+}
+
+.stage-row.is-current .stage-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.stage-row.is-locked .stage-marker {
+  border-style: dashed;
+}
+
+/* ------------------------------------------------------------------- lesson */
+
+.lesson-masthead {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: calc(var(--step) * 2);
+}
+
+.lesson-body {
+  max-width: 38rem;
+  margin-bottom: calc(var(--step) * 4);
+}
+
+.lesson-body p {
+  margin: 0 0 var(--step);
+  color: var(--ink-soft);
+  font-size: 1.0625rem;
+}
+
+.lesson-body code {
+  font-size: 0.9em;
+}
+
+.worked-example {
+  margin: 0 0 calc(var(--step) * 4);
+  border-top: 1px solid var(--rule);
+  padding-top: var(--step);
+}
+
+.worked-example-grid {
+  display: grid;
+  gap: calc(var(--step) * 2);
+  margin-top: 0.5rem;
+  align-items: start;
+}
+
+.lesson-source {
+  margin: 0;
+  padding: calc(var(--step) * 1.5);
+  background: rgb(255 255 255 / 0.5);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-family: var(--machine);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+@media (min-width: 46rem) {
+  .worked-example-grid {
+    /* Source and result side by side, as a worked example should read. */
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* The tutorial is the way in, so its card leads. */
+.mode-card-course {
+  box-shadow: inset 3px 0 0 var(--ink);
+}

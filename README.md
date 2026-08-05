@@ -1,6 +1,7 @@
 # pLaTeX
 
-A full-LaTeX typesetting game with three modes. Practice Mode is an untimed,
+A full-LaTeX typesetting game with four modes. The Tutorial is a guided course
+for someone who has never written LaTeX. Practice Mode is an untimed,
 topic-by-topic curriculum. Blaze Mode is a three-minute challenge in the spirit
 of [TeXnique](https://texnique.xyz/). Fix-it Mode hands you source that is
 already wrong and asks you to repair it.
@@ -9,7 +10,7 @@ The wordmark is set with LaTeX's own logo kerning, with gentler pulls than the
 canonical ratios because the interface is monospaced. See `.logotype` in
 `src/styles.css`.
 
-Practice Mode has 48 ordered exercises, six per topic in two tiers, across maths,
+The Tutorial has nine stages. Practice Mode has 48 ordered exercises, six per topic in two tiers, across maths,
 text formatting, accents and symbols, lists, tables, boxes and spacing, TikZ, and
 document structure. Blaze Mode uses a completely separate catalog of 100 shuffled
 problems, so a three-minute run of roughly eight problems does not repeat itself
@@ -40,6 +41,34 @@ browser so returning players go straight to their selected mode.
 Your Blaze best and Practice completion are kept separately in the browser's
 local storage. There is no server, so both are per browser and per device. A
 scoreless Blaze run is never recorded, and a tie does not count as beating it.
+
+## The Tutorial
+
+Nine stages on a map, unlocked in order. The first is a short piece on what LaTeX
+is and why anyone uses it; the other eight each explain one idea, show a worked
+example compiled beside its own source, then ask for a single thing back.
+
+The order carries the teaching: braces before maths, because `\frac` is
+unreadable without them, and maths mode before fractions, because "maths outside
+maths mode" is the first error a beginner hits and the status line already names
+it. `src/course.test.ts` asserts that ordering, so it cannot drift.
+
+Locked stages are `disabled` buttons rather than merely styled as locked, so
+gating reaches keyboard and screen-reader users without extra handling. Gating is
+derived from the completion set rather than stored, so a hand-edited store cannot
+open the course out of order. Entering the Tutorial skips the warm-up, and
+finishing a stage marks the warm-up done, since the course teaches the same loop
+and more.
+
+**One thing worth knowing about the content.** The shared preamble zeroes
+`\parindent` for deterministic layout, which makes a paragraph break render
+*identically* to a line break. The stage on paragraphs restores the indent in its
+own preamble, or the lesson would be invisible and the exercise would accept `\\`
+as a correct answer. Writing that stage turned up three existing problems with the
+same flaw — Blaze's `paragraph-break` and `noindent-paragraph`, and Practice's
+`practice-structure-paragraphs`, whose `\noindent` had nothing to suppress. All
+four now restore the indent, and a test in `src/course.test.ts` requires it of any
+target containing a blank line.
 
 ## Fix-it Mode
 
@@ -145,10 +174,11 @@ npm run verify           # everything below, in order
 | --- | --- |
 | `npm test` | Pure logic: both session types, catalog separation, practice progress, scoring, normalization, pixel comparison, and hash shim |
 | `npm run smoke` | Engine init, cross-origin isolation, render determinism, equivalent-markup matching, near-miss rejection, that a failed compile is explained, recovery from a runaway macro |
-| `npm run verify:problems` | Every problem compiles, renders non-blank, fits one page, stays inside the margins, loads only bundled packages, and has at least one Fix-it mutation that does not reproduce the target |
+| `npm run verify:problems` | Every problem, tutorial exercise and worked example compiles, renders non-blank, fits one page, stays inside the margins and loads only bundled packages; Blaze problems additionally need one Fix-it mutation that does not reproduce the target |
 | `npm run verify:best` | The personal best across several runs: first record, missed record, beaten record, and survival of a reload |
 | `npm run verify:editor` | Auto-closing delimiters driven by real keystrokes, that undo survives, that a compile error names its cause, and that a problem typed key by key still solves |
 | `npm run verify:fixit` | Fix-it end to end: the editor arrives pre-filled and wrong, the hint describes the fault, repairing counts, and a repair left for later comes back |
+| `npm run verify:course` | All nine tutorial stages: locked stages cannot be entered, worked examples render, finishing one opens the next, progress survives a reload, and the warm-up is cleared |
 | `npm run verify:build` | Both modes actually play through the production bundle, including persisted practice progress |
 | `npm run shots` | Screenshots of every screen and state, for design review |
 
@@ -295,6 +325,8 @@ src/
   render/
     rasterize.ts       PDF bytes to pixels via pdf.js
     compare.ts         strict pixel equality                         [tested]
+  course.ts            the nine tutorial stages, and their prose      [tested]
+  courseProgress.ts    which stages are done, and so which are open   [tested]
   fixit.ts             mutations that turn a source into a puzzle     [tested]
   editor/
     autoPairs.ts       which delimiter to close, and how              [tested]

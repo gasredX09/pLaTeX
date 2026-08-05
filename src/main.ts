@@ -13,6 +13,14 @@ import {
   type PracticeTopic,
 } from './practiceProblems.js';
 import { PracticeSession } from './practiceSession.js';
+import { courseStages, parseProse } from './course.js';
+import {
+  completeCourseStage,
+  isCourseComplete,
+  isUnlocked,
+  nextStageIndex,
+  readCourseProgress,
+} from './courseProgress.js';
 import {
   buildFixitRound,
   candidateBreaks,
@@ -32,7 +40,7 @@ import { AttemptChecker, type CheckStatus, type CheckOutcome } from './tex/compi
 import type { TexError } from './tex/explainError.js';
 import { planKey, planIndent } from './editor/autoPairs.js';
 import { applyEdit } from './editor/textareaEdit.js';
-import { paint } from './render/rasterize.js';
+import { paint, rasterizeFirstPage } from './render/rasterize.js';
 import {
   completeTutorial,
   hasCompletedTutorial,
@@ -71,7 +79,24 @@ const ui = {
   end: need<HTMLElement>('end'),
   practiceEnd: need<HTMLElement>('practice-end'),
 
+  courseMode: need<HTMLButtonElement>('course-mode'),
   practiceMode: need<HTMLButtonElement>('practice-mode'),
+
+  courseMap: need<HTMLElement>('course-map'),
+  courseStandfirst: need<HTMLElement>('course-standfirst'),
+  stageList: need<HTMLOListElement>('stage-list'),
+  courseHome: need<HTMLButtonElement>('course-home'),
+
+  lesson: need<HTMLElement>('lesson'),
+  lessonStage: need<HTMLElement>('lesson-stage'),
+  lessonTitle: need<HTMLElement>('lesson-title'),
+  lessonBody: need<HTMLElement>('lesson-body'),
+  lessonExample: need<HTMLElement>('lesson-example'),
+  lessonExampleCaption: need<HTMLElement>('lesson-example-caption'),
+  lessonExampleSource: need<HTMLElement>('lesson-example-source'),
+  lessonExampleCanvas: need<HTMLCanvasElement>('lesson-example-canvas'),
+  lessonContinue: need<HTMLButtonElement>('lesson-continue'),
+  lessonBack: need<HTMLButtonElement>('lesson-back'),
   blazeMode: need<HTMLButtonElement>('blaze-mode'),
   fixitMode: need<HTMLButtonElement>('fixit-mode'),
   engineStatus: need<HTMLParagraphElement>('engine-status'),
@@ -160,7 +185,12 @@ const game = new Game(blazeProblems);
 let practiceSession: PracticeSession | null = null;
 let selectedTopic: PracticeTopic | null = null;
 
-type ActiveMode = 'blaze' | 'practice' | 'fixit';
+/*
+ * Mode names, since one of them is confusing: 'course' is what the interface
+ * calls **Tutorial**. The separate thing called `tutorial` throughout this file
+ * is the one-off first-run exercise the interface calls **Warm-up**.
+ */
+type ActiveMode = 'blaze' | 'practice' | 'fixit' | 'course';
 type PendingStart =
   | { mode: 'blaze' }
   | { mode: 'practice'; topic: PracticeTopic }
@@ -172,6 +202,9 @@ let pendingStart: PendingStart | null = null;
 let fixitSession: PracticeSession<BrokenProblem> | null = null;
 /** Repairs in the current round, for the progress rail. */
 let fixitRoundTotal = 0;
+let courseProgress = readCourseProgress(storage);
+/** Index into courseStages of the stage being read or exercised. */
+let courseStageIndex = 0;
 
 // A short round is handy when checking the end screen. Dev only, so the shipped
 // game always runs the full three minutes.
@@ -199,6 +232,7 @@ const warmClock = setInterval(() => {
 engine.onStageChange = (stage, detail, percent) => {
   if (stage === 'ready') {
     clearInterval(warmClock);
+    ui.courseMode.disabled = false;
     ui.practiceMode.disabled = false;
     ui.blazeMode.disabled = false;
     ui.fixitMode.disabled = false;
@@ -241,11 +275,21 @@ renderTopics();
 
 // --------------------------------------------------------------- transitions
 
-type Screen = 'intro' | 'topics' | 'tutorial' | 'play' | 'end' | 'practice-end';
+type Screen =
+  | 'intro'
+  | 'topics'
+  | 'course-map'
+  | 'lesson'
+  | 'tutorial'
+  | 'play'
+  | 'end'
+  | 'practice-end';
 
 function show(screen: Screen): void {
   ui.intro.hidden = screen !== 'intro';
   ui.topics.hidden = screen !== 'topics';
+  ui.courseMap.hidden = screen !== 'course-map';
+  ui.lesson.hidden = screen !== 'lesson';
   ui.tutorial.hidden = screen !== 'tutorial';
   ui.play.hidden = screen !== 'play';
   ui.end.hidden = screen !== 'end';
@@ -259,6 +303,58 @@ function renderBest(): void {
   if (!best) return;
   ui.introBestValue.textContent = describeBest(best);
   ui.railBest.textContent = String(best.score);
+}
+
+/**
+ * The map. Built the way renderTopics builds topic cards, with the state carried
+ * on the row class and on the button's disabled attribute, so gating reaches
+ * keyboard and screen-reader users without any extra handling.
+ */
+function renderCourseMap(): void {
+  ui.stageList.replaceChildren();
+
+  const next = nextStageIndex(courseStages, courseProgress);
+  ui.courseStandfirst.textContent = isCourseComplete(courseStages, courseProgress)
+    ? 'All nine stages are complete. Revisit any of them, or move on to Practice Mode.'
+    : 'Nine stages, in order. Each one explains an idea, shows a worked example, then asks you to write one thing yourself.';
+
+  for (const [index, stage] of courseStages.entries()) {
+    const done = courseProgress.has(stage.id);
+    const open = isUnlocked(index, courseStages, courseProgress);
+    const current = index === next;
+
+    const row = document.createElement('li');
+    row.className = `stage-row ${done ? 'is-done' : current ? 'is-current' : ''}${open ? '' : ' is-locked'}`.trim();
+
+    const button = document.createElement('button');
+    button.className = 'stage-card';
+    button.type = 'button';
+    button.disabled = !open;
+    button.dataset.stage = stage.id;
+    const state = done ? 'complete' : open ? 'available' : 'locked';
+    button.setAttribute('aria-label', `Stage ${index + 1}, ${stage.title}, ${state}`);
+
+    const marker = document.createElement('span');
+    marker.className = 'stage-marker';
+    // A tick reads better than a number once a stage is behind you.
+    marker.textContent = done ? '\u2713' : String(index + 1);
+    marker.setAttribute('aria-hidden', 'true');
+
+    const title = document.createElement('span');
+    title.className = 'stage-title';
+    title.textContent = stage.title;
+
+    const summary = document.createElement('span');
+    summary.className = 'stage-summary';
+    summary.textContent = stage.summary;
+
+    button.append(marker, title, summary);
+    button.addEventListener('click', () => {
+      void openLesson(index);
+    });
+    row.append(button);
+    ui.stageList.append(row);
+  }
 }
 
 function renderTopics(): void {
@@ -322,6 +418,104 @@ function chooseBlaze(): void {
   engine.preload(PRELOAD_BUNDLES);
   if (tutorialComplete) continuePendingStart();
   else void startTutorial();
+}
+
+/**
+ * Tutorial Mode does not go through the warm-up. The warm-up exists to teach the
+ * compile-and-match loop, which this course teaches in stage 1 along with the
+ * rest, so making a beginner sit through it first would be redundant. It is
+ * marked complete on the first successful match so they never meet it later.
+ */
+function chooseCourse(): void {
+  pendingStart = null;
+  activeMode = 'course';
+  clearInterval(clockTimer);
+  practiceSession = null;
+  fixitSession = null;
+  selectedTopic = null;
+  courseProgress = readCourseProgress(storage);
+  renderCourseMap();
+  show('course-map');
+  ui.courseHome.focus();
+}
+
+/** Builds a paragraph, turning backtick spans into code without any innerHTML. */
+function proseParagraph(text: string): HTMLParagraphElement {
+  const paragraph = document.createElement('p');
+  for (const segment of parseProse(text)) {
+    if (segment.kind === 'code') {
+      const code = document.createElement('code');
+      code.textContent = segment.text;
+      paragraph.append(code);
+    } else {
+      paragraph.append(document.createTextNode(segment.text));
+    }
+  }
+  return paragraph;
+}
+
+/**
+ * Shows a stage: its prose, and its worked example compiled so the reader sees
+ * the source and the result it produces side by side.
+ */
+async function openLesson(index: number): Promise<void> {
+  const stage = courseStages[index];
+  if (!stage || !isUnlocked(index, courseStages, courseProgress)) return;
+
+  activeMode = 'course';
+  courseStageIndex = index;
+  checker.cancel();
+
+  ui.lessonStage.textContent = `Stage ${index + 1} of ${courseStages.length}`;
+  ui.lessonTitle.textContent = stage.title;
+  ui.lessonBody.replaceChildren(...stage.body.map(proseParagraph));
+  // The opening stage is prose only, so it reads on rather than into an exercise.
+  ui.lessonContinue.textContent = stage.exercise ? 'Start the exercise' : 'Next';
+  ui.lessonExample.hidden = !stage.example;
+  clearCanvas(ui.lessonExampleCanvas);
+  show('lesson');
+  ui.lessonContinue.focus();
+
+  if (!stage.example) return;
+  ui.lessonExampleCaption.textContent = stage.example.caption;
+  ui.lessonExampleSource.textContent = stage.example.source;
+
+  const outcome = await engine.compile(stage.example.source, stage.example.preamble);
+  // The reader may have moved on while this compiled.
+  if (ui.lesson.hidden || courseStageIndex !== index) return;
+  if (outcome.status !== 'ok') {
+    // Verified at build time, so this should be unreachable. Hide the frame
+    // rather than leave an empty card next to a caption promising a render.
+    telemetry.report({ event: 'target_compile_failed', problem: `${stage.id}-example` });
+    ui.lessonExample.hidden = true;
+    return;
+  }
+  paint(ui.lessonExampleCanvas, (await rasterizeFirstPage(outcome.pdf)).image);
+}
+
+/** Leaves the lesson for its exercise, or straight on for the prose-only stage. */
+function continueFromLesson(): void {
+  const stage = courseStages[courseStageIndex];
+  if (!stage) return;
+
+  if (!stage.exercise) {
+    courseProgress = completeCourseStage(storage, courseProgress, stage.id);
+    renderCourseMap();
+    show('course-map');
+    return;
+  }
+
+  configurePlayScreen('course');
+  show('play');
+  renderCourseRail();
+  void loadCurrentProblem();
+}
+
+function renderCourseRail(): void {
+  const done = courseStages.filter((stage) => courseProgress.has(stage.id)).length;
+  ui.practiceTopicLabel.textContent = 'Tutorial';
+  ui.practiceProgressText.textContent = `Stage ${courseStageIndex + 1} of ${courseStages.length}`;
+  ui.practiceProgressFill.style.width = `${(done / courseStages.length) * 100}%`;
 }
 
 function chooseFixit(): void {
@@ -436,7 +630,11 @@ function startPractice(topic: PracticeTopic): void {
   void loadCurrentProblem();
 }
 
-function continueLabel(mode: ActiveMode): string {
+/**
+ * Only the modes that can be pending behind the warm-up. Tutorial Mode bypasses
+ * it, so it never reaches here.
+ */
+function continueLabel(mode: PendingStart['mode']): string {
   return {
     practice: 'Begin Practice Mode',
     fixit: 'Begin Fix-it Mode',
@@ -475,7 +673,11 @@ function configurePlayScreen(mode: ActiveMode): void {
   ui.skip.textContent = timed ? 'Skip' : 'Later';
   // The shared rail's exit leads back to wherever the mode was entered from,
   // and Fix-it was not entered from the topic list.
-  ui.practiceExit.textContent = mode === 'fixit' ? 'Choose a mode' : 'Choose topic';
+  ui.practiceExit.textContent =
+    mode === 'fixit' ? 'Choose a mode' : mode === 'course' ? 'Back to the map' : 'Choose topic';
+  // A locked linear course has nothing to defer an exercise to, so Skip leaves
+  // for the map instead of queueing the stage for later.
+  if (mode === 'course') ui.skip.textContent = 'Back to the map';
 }
 
 function finishBlaze(): void {
@@ -532,6 +734,7 @@ function activeProblem(): Problem | null {
   if (activeMode === 'fixit' && fixitSession?.status === 'running') {
     return fixitSession.current.problem;
   }
+  if (activeMode === 'course') return courseStages[courseStageIndex]?.exercise ?? null;
   return null;
 }
 
@@ -543,6 +746,17 @@ async function loadCurrentProblem(): Promise<void> {
   if (activeMode === 'blaze') {
     ui.problemNumber.textContent = `Problem ${game.problemNumber}`;
     ui.problemPoints.textContent = formatPoints(game.currentPoints);
+  } else if (activeMode === 'course') {
+    ui.problemNumber.textContent = `Stage ${courseStageIndex + 1} of ${courseStages.length}`;
+    const exercise = courseStages[courseStageIndex]?.exercise;
+    if (exercise) {
+      ui.practiceHintText.textContent = exercise.hint;
+      ui.practiceHintText.hidden = true;
+      ui.practiceHint.textContent = 'Show hint';
+      ui.practiceSolutionCode.textContent = exercise.latex;
+      ui.practiceSolution.hidden = true;
+      ui.practiceReveal.textContent = 'Reveal source';
+    }
   } else if (activeMode === 'fixit') {
     const repaired = fixitSession?.completed.length ?? 0;
     ui.problemNumber.textContent = `Repair ${repaired + 1} of ${fixitRoundTotal}`;
@@ -717,6 +931,28 @@ function advanceActive(outcome: 'solve' | 'skip'): void {
     if (outcome === 'solve') game.solve();
     else game.skip();
     renderBlazeRail();
+  } else if (mode === 'course') {
+    const stage = courseStages[courseStageIndex];
+    if (!stage) return;
+    if (outcome === 'solve') {
+      courseProgress = completeCourseStage(storage, courseProgress, stage.id);
+      // The course supersedes the warm-up, so it is never shown afterwards.
+      rememberTutorial();
+    }
+    // Either way the next screen is the map, where a solved stage is marked and
+    // the next one opens. A solve waits a beat so the locked registration mark is
+    // legible first; leaving for the map was an explicit click and should not.
+    const toMap = () => {
+      if (activeMode !== 'course') return;
+      if (isCourseComplete(courseStages, courseProgress)) finishCourse();
+      else {
+        renderCourseMap();
+        show('course-map');
+      }
+    };
+    if (outcome === 'solve') setTimeout(toMap, 450);
+    else toMap();
+    return;
   } else if (mode === 'fixit') {
     const session = fixitSession;
     if (!session || session.status !== 'running') return;
@@ -788,6 +1024,25 @@ function renderBlazeEnd(): void {
 
   fill(ui.solvedList, game.solved.map((s) => [s.problem.title, `+${s.points}`]), 'Nothing yet');
   fill(ui.skippedList, game.skipped.map((p) => [p.title, '']), 'Nothing skipped');
+}
+
+/** Reuses the untimed end sheet, pointing onward to Practice Mode. */
+function finishCourse(): void {
+  checker.cancel();
+  ui.input.disabled = true;
+  ui.practiceFinalTitle.textContent = 'Tutorial complete';
+  ui.practiceFinalSummary.textContent =
+    'That is the whole mental model. Practice Mode has forty-eight exercises grouped by topic, all untimed, whenever you want them.';
+  fill(
+    ui.practiceCompletedList,
+    courseStages.map((stage) => [stage.title, 'complete']),
+    'Nothing completed',
+  );
+  fill(ui.practiceLaterList, [], 'Nothing left behind');
+  ui.practiceAgain.textContent = 'Start Practice Mode';
+  ui.practiceAnother.hidden = true;
+  show('practice-end');
+  ui.practiceAgain.focus();
 }
 
 function finishFixit(): void {
@@ -876,17 +1131,28 @@ function fill(list: HTMLUListElement, rows: [string, string][], empty: string): 
 ui.practiceMode.addEventListener('click', openTopics);
 ui.blazeMode.addEventListener('click', chooseBlaze);
 ui.fixitMode.addEventListener('click', chooseFixit);
+ui.courseMode.addEventListener('click', chooseCourse);
+ui.courseHome.addEventListener('click', returnHome);
+ui.lessonContinue.addEventListener('click', continueFromLesson);
+ui.lessonBack.addEventListener('click', () => {
+  renderCourseMap();
+  show('course-map');
+});
 ui.topicsHome.addEventListener('click', returnHome);
 ui.again.addEventListener('click', startBlaze);
 ui.endHome.addEventListener('click', returnHome);
 ui.practiceExit.addEventListener('click', () => {
   if (activeMode === 'fixit') returnHome();
-  else openTopics();
+  else if (activeMode === 'course') {
+    renderCourseMap();
+    show('course-map');
+  } else openTopics();
 });
 ui.practiceAnother.addEventListener('click', openTopics);
 ui.practiceHome.addEventListener('click', returnHome);
 ui.practiceAgain.addEventListener('click', () => {
   if (activeMode === 'fixit') startFixit();
+  else if (activeMode === 'course') openTopics();
   else if (selectedTopic) startPractice(selectedTopic);
 });
 

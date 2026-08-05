@@ -545,6 +545,8 @@ Text beneath it.`,
     title: 'Two Paragraphs',
     description: 'Start a new paragraph, and notice the indent.',
     hint: String.raw`A blank line begins a paragraph; \\ does not.`,
+    // The hint is only true if the indent is visible.
+    preamble: String.raw`\setlength{\parindent}{1em}`,
     latex: String.raw`Opening thought.
 
 Following thought.`,
