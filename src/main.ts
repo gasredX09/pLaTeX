@@ -126,6 +126,7 @@ const ui = {
   practiceProgressFill: need<HTMLElement>('practice-progress-fill'),
   practiceExit: need<HTMLButtonElement>('practice-exit'),
 
+  blazeExit: need<HTMLButtonElement>('blaze-exit'),
   clock: need<HTMLElement>('clock'),
   clockFill: need<HTMLElement>('clock-fill'),
   score: need<HTMLElement>('score'),
@@ -683,6 +684,9 @@ function configurePlayScreen(mode: ActiveMode): void {
 function finishBlaze(): void {
   clearInterval(clockTimer);
   checker.cancel();
+  // Also covers ending early: without it the run stays 'running', and a compile
+  // already in flight could score after the sheet is up.
+  game.end();
   ui.input.disabled = true;
   renderBlazeEnd();
   show('end');
@@ -1132,6 +1136,9 @@ ui.practiceMode.addEventListener('click', openTopics);
 ui.blazeMode.addEventListener('click', chooseBlaze);
 ui.fixitMode.addEventListener('click', chooseFixit);
 ui.courseMode.addEventListener('click', chooseCourse);
+ui.blazeExit.addEventListener('click', () => {
+  if (activeMode === 'blaze' && game.status === 'running') finishBlaze();
+});
 ui.courseHome.addEventListener('click', returnHome);
 ui.lessonContinue.addEventListener('click', continueFromLesson);
 ui.lessonBack.addEventListener('click', () => {

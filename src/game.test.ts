@@ -114,3 +114,58 @@ describe('formatClock', () => {
     expect(formatClock(0)).toBe('0:00');
   });
 });
+
+describe('ending a run early', () => {
+  it('stops the run and zeroes the clock', () => {
+    const game = new Game(deck, noShuffle);
+    game.start();
+    game.tick(30);
+    game.end();
+    expect(game.status).toBe('over');
+    expect(game.secondsLeft).toBe(0);
+  });
+
+  it('keeps the points already earned', () => {
+    // Giving up remaining time can only lower a score, so there is nothing to
+    // exploit, and discarding earned points would be unkind.
+    const game = new Game(deck, noShuffle);
+    game.start();
+    game.solve();
+    const earned = game.score;
+    game.end();
+    expect(game.score).toBe(earned);
+    expect(game.solved).toHaveLength(1);
+  });
+
+  it('refuses further play, so a late compile cannot score', () => {
+    const game = new Game(deck, noShuffle);
+    game.start();
+    game.end();
+    const score = game.score;
+    game.solve();
+    game.skip();
+    expect(game.score).toBe(score);
+    expect(game.solved).toHaveLength(0);
+  });
+
+  it('does nothing to a run that never started or already ended', () => {
+    const idle = new Game(deck, noShuffle);
+    idle.end();
+    expect(idle.status).toBe('idle');
+
+    const finished = new Game(deck, noShuffle);
+    finished.start();
+    finished.tick(ROUND_SECONDS);
+    finished.end();
+    expect(finished.status).toBe('over');
+  });
+
+  it('is undone by starting again', () => {
+    const game = new Game(deck, noShuffle);
+    game.start();
+    game.end();
+    game.start();
+    expect(game.status).toBe('running');
+    expect(game.secondsLeft).toBe(ROUND_SECONDS);
+  });
+});

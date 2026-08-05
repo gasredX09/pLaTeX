@@ -280,6 +280,9 @@
             >points<span class="rail-best" id="rail-best" hidden></span
           ></span>
         </div>
+        <!-- Without this, a Blaze run cannot be left until the clock runs out:
+             the only other exit lives in the practice rail, which is hidden here. -->
+        <button class="button button-quiet" id="blaze-exit">End run</button>
       </div>
 
       <div class="rail practice-rail" id="practice-rail" hidden>

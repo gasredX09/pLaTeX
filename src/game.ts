@@ -90,6 +90,20 @@ export class Game {
     this.position++;
   }
 
+  /**
+   * Ends the run before the clock does, for a player who wants out.
+   *
+   * The score stands: giving up remaining time can only lower it, so there is
+   * nothing to exploit, and discarding points somebody earned would be unkind.
+   * Setting the status matters as much as stopping the clock, since a compile
+   * still in flight would otherwise be allowed to score into a finished run.
+   */
+  end(): void {
+    if (this.status !== 'running') return;
+    this.status = 'over';
+    this.secondsLeft = 0;
+  }
+
   /** Advances the clock. Returns true when this tick ended the run. */
   tick(seconds = 1): boolean {
     if (this.status !== 'running') return false;

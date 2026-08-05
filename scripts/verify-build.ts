@@ -97,6 +97,20 @@ try {
   await practicePage.goto(url, { waitUntil: 'domcontentloaded' });
   await practicePage.waitForSelector('#practice-mode:not([disabled])', { timeout: 180_000 });
   await practicePage.click('#practice-mode');
+  // A Blaze run must be leavable. The only other exit lives in the practice
+  // rail, which Blaze hides, so for a while the mode was a three-minute trap.
+  check('the Blaze rail offers a way out', await page.locator('#blaze-exit').isVisible());
+  await page.click('#blaze-exit');
+  await page.waitForSelector('#end:not([hidden])', { timeout: 20_000 });
+  check('ending early reaches the end sheet without waiting for the clock', true);
+  check(
+    'the score earned so far is kept',
+    Number(await page.textContent('#final-score')) > 0,
+    (await page.textContent('#final-score')) ?? '',
+  );
+  await page.click('#end-home');
+  await page.waitForSelector('#intro:not([hidden])', { timeout: 20_000 });
+
   check('Practice Mode opens topic selection', await practicePage.locator('#topics').isVisible());
   check(
     'all practice topics are offered',
